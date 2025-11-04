@@ -4,6 +4,53 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
+install_prompt_templates() {
+  local src_dir="${ROOT_DIR}/templates/prompts"
+  local dest_dir="${HOME}/.codex/prompts"
+
+  if [ ! -d "$src_dir" ]; then
+    echo "Prompt templates directory not found: ${src_dir}" >&2
+    return 1
+  fi
+
+  mkdir -p "$dest_dir"
+
+  local installed=0
+  local skipped=0
+  for src in "$src_dir"/*.md; do
+    [ -e "$src" ] || continue
+    local dest="${dest_dir}/$(basename "$src")"
+    if [ -f "$dest" ]; then
+      echo "Keeping existing prompt: ${dest}"
+      skipped=1
+      continue
+    fi
+    cp "$src" "$dest"
+    echo "Installed prompt template: ${dest}"
+    installed=1
+  done
+
+  if [ "$installed" -eq 0 ]; then
+    if [ "$skipped" -eq 0 ]; then
+      echo "No prompt templates found to install."
+    else
+      echo "All prompt templates already present in ${dest_dir}."
+    fi
+  fi
+}
+
+maybe_install_prompt_templates() {
+  local dest_dir="${HOME}/.codex/prompts"
+  printf "Install prompt templates to %s? Existing files will be kept. [y/N] " "$dest_dir"
+  local ans
+  if ! read -r ans; then ans="n"; fi
+  if [[ "$ans" =~ ^[Yy]$ ]]; then
+    install_prompt_templates
+  else
+    echo "Skipping prompt template installation."
+  fi
+}
+
 usage() {
   cat <<USAGE
 codex-1up — wrapper
@@ -85,6 +132,7 @@ case "$cmd" in
     fi
 
     cp -f "$src" "$path"
+    maybe_install_prompt_templates
     echo "Wrote ${path} (template: ${template})"
     ;;
   doctor)

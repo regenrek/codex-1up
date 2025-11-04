@@ -512,6 +512,58 @@ maybe_prompt_global_agents() {
   ok "Wrote ${target_path}"
 }
 
+install_prompt_templates() {
+  local src_dir="${ROOT_DIR}/templates/prompts"
+  local dest_dir="${HOME}/.codex/prompts"
+
+  if [ ! -d "$src_dir" ]; then
+    warn "Prompt templates directory not found (${src_dir})"
+    return 0
+  fi
+
+  mkdir -p "$dest_dir"
+
+  local installed_any=false
+  local skipped_any=false
+
+  for src in "$src_dir"/*.md; do
+    [ -e "$src" ] || continue
+    local filename
+    filename="$(basename "$src")"
+    local dest="${dest_dir}/${filename}"
+    if [ -f "$dest" ]; then
+      info "Keeping existing prompt: ${dest}"
+      skipped_any=true
+      continue
+    fi
+    installed_any=true
+    if $DRY_RUN; then
+      echo "[dry-run] copy ${src} -> ${dest}"
+    else
+      run cp "$src" "$dest"
+    fi
+    ok "Installed prompt template: ${dest}"
+  done
+
+  if [ "$installed_any" = false ] && [ "$skipped_any" = false ]; then
+    info "No prompt templates found to install"
+  fi
+}
+
+maybe_install_prompt_templates() {
+  if $SKIP_CONFIRMATION; then
+    info "Skipping prompt template installation (non-interactive mode)"
+    return 0
+  fi
+
+  local dest_dir="${HOME}/.codex/prompts"
+  if confirm "Install prompt templates to ${dest_dir}? Existing files will be kept."; then
+    install_prompt_templates
+  else
+    info "Skipping prompt template installation"
+  fi
+}
+
 maybe_install_vscode_ext() {
   $NO_VSCODE && return 0
   if [ -z "$VSCE_ID" ]; then
@@ -579,6 +631,7 @@ main() {
   configure_shell
   write_codex_config
   maybe_prompt_global_agents
+  maybe_install_prompt_templates
   maybe_install_vscode_ext
   maybe_write_agents
 
