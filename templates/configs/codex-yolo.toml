@@ -1,12 +1,18 @@
 # ~/.codex/config.toml  — YOLO
 
-model = "gpt-5"
+model = "gpt-5-codex"
+hide_agent_reasoning=false
+model_reasoning_summary="auto"
+show_raw_agent_reasoning=true
 
 # Never ask for approval; just run.
 approval_policy = "never"
 
 # Disable sandboxing entirely: full disk + network access.
 sandbox_mode = "danger-full-access"
+
+[features]
+web_search_request = true
 
 [shell_environment_policy]
 # Hand over the entire environment as-is (including keys/tokens).

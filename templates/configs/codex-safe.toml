@@ -1,13 +1,20 @@
 # ~/.codex/config.toml  — SAFE
 
 # Use the default OpenAI provider and model unless you override on the CLI.
-model = "gpt-5"
+model = "gpt-5-codex"
+hide_agent_reasoning=false
+model_reasoning_summary="auto"
+show_raw_agent_reasoning=true
 
 # Ask to escalate only if a command fails due to sandbox limits.
 approval_policy = "on-failure"
 
 # Writable only inside the workspace (and tmp). Still sandboxed.
 sandbox_mode = "workspace-write"
+
+
+[features]
+web_search_request = true
 
 [sandbox_workspace_write]
 # Allow outbound network (package installs, git fetch, API calls) *inside* the sandbox.
