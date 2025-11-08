@@ -28,4 +28,12 @@ describe('config init/write', () => {
     // Ensure minimal profile does not force an unsupported summary value
     expect(data).not.toMatch(/\[profiles\.minimal\][\s\S]*model_reasoning_summary\s*=/)
   })
+
+  it('enables reasoning steps in TUI by default', async () => {
+    process.env.HOME = td
+    await runCommand(root, { rawArgs: ['config', 'init', '--force'] })
+    const data = await fs.readFile(CFG, 'utf8')
+    expect(data).toMatch(/\[tui\][\s\S]*show_raw_agent_reasoning\s*=\s*true/)
+    expect(data).toMatch(/\[tui\][\s\S]*hide_agent_reasoning\s*=\s*false/)
+  })
 })

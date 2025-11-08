@@ -18,6 +18,10 @@ network_access = true
 # Desktop notifications from the TUI: boolean or filtered list. Default: false
 # Examples: true | ["agent-turn-complete", "approval-requested"]
 notifications = false
+# Show raw reasoning content when available (default: false)
+show_raw_agent_reasoning = true
+# Ensure we do not hide internal reasoning (default: false)
+hide_agent_reasoning = false
 
 # Centralized feature flags — booleans only
 [features]
