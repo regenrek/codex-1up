@@ -22,7 +22,6 @@ SKIP_CONFIRMATION=false
 SHELL_TARGET="auto"
 VSCE_ID=""
 NO_VSCODE=false
-GIT_EXTERNAL_DIFF=false
 INSTALL_NODE="nvm"
 AGENTS_TARGET=""
 AGENTS_TEMPLATE="default"
@@ -67,7 +66,6 @@ Usage: ./install.sh [options]
   --shell auto|zsh|bash|fish
   --vscode EXT_ID           install VS Code extension id (e.g. openai.codex)
   --no-vscode               skip VS Code extension checks
-  --git-external-diff       set difftastic as git's external diff (opt-in)
   --install-node nvm|brew|skip   how to install Node if missing (default: nvm)
   --agents-md [PATH]        write starter AGENTS.md to PATH (default: \$PWD/AGENTS.md)
   --agents-template default|typescript|python|shell  template variant for AGENTS.md (default: default)
@@ -83,7 +81,6 @@ while [ $# -gt 0 ]; do
     --shell) SHELL_TARGET="${2:-auto}"; shift ;;
     --vscode) VSCE_ID="${2:-}"; shift ;;
     --no-vscode) NO_VSCODE=true ;;
-    --git-external-diff) GIT_EXTERNAL_DIFF=true ;;
     --install-node) INSTALL_NODE="${2:-nvm}"; shift ;;
     --agents-md)
       if [ "${2:-}" ] && [[ ! "${2}" =~ ^-- ]]; then AGENTS_TARGET="${2}"; shift; else AGENTS_TARGET="$PWD/AGENTS.md"; fi
@@ -260,38 +257,7 @@ ensure_tools() {
   done
 }
 
-configure_git() {
-  # Skip entirely if git is not present
-  if ! need_cmd git; then
-    info "git not found; skipping git configuration"
-    return 0
-  fi
-
-  if [ "${INSTALL_MODE}" != "recommended" ]; then
-    if ! confirm "Configure git diff tools for better syntax-aware code diffs (recommended for developers)?"; then
-    info "Skipping git configuration"
-    return 0
-  fi
-else
-  info "Configuring git difftool aliases (recommended install)"
-fi
-
-  info "Configuring git difftool aliases"
-  if need_cmd difft || need_cmd difftastic; then
-    run git config --global difftool.difftastic.cmd 'difft "$LOCAL" "$REMOTE"' || warn "Failed to configure difftastic difftool"
-    run git config --global difftool.prompt false || warn "Failed to disable difftool prompt"
-    ok "Configured git difftool 'difftastic'"
-    if $GIT_EXTERNAL_DIFF; then
-      run git config --global diff.external difft || warn "Failed to set git external diff"
-      ok "Set git diff.external = difft"
-    fi
-  elif need_cmd delta; then
-    run git config --global core.pager delta || warn "Failed to configure delta pager"
-    ok "Configured git pager to delta (fallback)"
-  else
-    warn "No difftastic or delta found; git diff will remain default"
-  fi
-}
+configure_git() { info "Skipping git difftool configuration (disabled)"; return 0; }
 
 target_shell_rc() {
   local st="${SHELL_TARGET}"

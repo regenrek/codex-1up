@@ -34,7 +34,6 @@ codex-1up install
 ### Common flags
 
 - `--shell auto|zsh|bash|fish`
-- `--git-external-diff`    : set difftastic as git's external diff (opt-in)
 - `--vscode EXT_ID`        : install a VS Code extension (e.g. `openai.codex`)
 - `--agents-md [PATH]`     : write a starter `AGENTS.md` to PATH (default: `$PWD/AGENTS.md`)
 - `--agents-template T`    : choose `AGENTS.md` template: `default|typescript|python|shell` (default: `default`)
@@ -57,7 +56,6 @@ codex-1up install
 | **ripgrep (rg)**          | Fast text search across code.                                                           |
 | **fzf**                   | Fuzzy‑finder to select among many matches.                                              |
 | **jq** / **yq**           | Reliable JSON/YAML processing on the command line.                                      |
-| **difftastic**            | Semantic code diffs for reviewing AI edits; falls back to `git-delta` when unavailable. |
 | —                         | —                                                                                       |
 | **\~/.codex/config.toml** | Single template with multiple profiles. Active profile is chosen during install (default: `balanced`). See [Codex config reference](https://github.com/openai/codex/blob/main/docs/config.md). |
 | **AGENTS.md**             | Minimal per‑repo rubric; installer can also create global `~/.codex/AGENTS.md`.         |
@@ -125,17 +123,6 @@ mkdir -p ~/.codex
 ```
 
 See memory behavior with AGENTS.md in the official docs: [Memory with AGENTS.md](https://github.com/openai/codex/blob/main/docs/getting-started.md#memory-with-agentsmd).
-
-## Git difftool (optional)
-
-If enabled, the installer configures:
-
-- `git difftool` with `difft` (from `difftastic`) for syntax‑aware diffs
-- Falls back to `delta` pager if `difftastic` is unavailable
-
-Notes:
-- Skips entirely if `git` is not installed
-- You can opt out during installation
 
 ### Notes
 - Global npm packages (`@openai/codex`, `@ast-grep/cli`) are checked and only missing/outdated versions are installed.
