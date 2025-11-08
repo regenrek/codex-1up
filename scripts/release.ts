@@ -1,6 +1,7 @@
 import { execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
 
 interface PackageTarget {
 	name: string;
@@ -122,6 +123,8 @@ async function publishPackages(
 
 	const newVersion = bumpAllVersions(versionBump);
 
+	let repoSlug = "";
+
 	for (const target of packageTargets.filter((pkg) => pkg.publish)) {
 		const pkgPath = path.resolve(target.dir);
 		const manifestPath = path.join(pkgPath, "package.json");
@@ -130,6 +133,13 @@ async function publishPackages(
 			continue;
 		}
 		const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+		try {
+			const repoUrl: string | undefined = manifest?.repository?.url;
+			if (repoUrl) {
+				const m = repoUrl.match(/github\.com\/(.+?)\.git$/);
+				if (m) repoSlug = m[1];
+			}
+		} catch {}
 		if (manifest.private) {
 			console.warn(
 				`Skipping publish for ${target.name}; package.json is marked private`,
@@ -150,14 +160,6 @@ async function publishPackages(
 				let readme = fs.readFileSync(rootReadme, "utf8");
 				// If README uses local ./public images, rewrite to absolute GitHub raw URLs
 				// Derive repo slug from package.json repository.url when possible
-				let repoSlug = "";
-				try {
-					const repoUrl: string | undefined = manifest?.repository?.url;
-					if (repoUrl) {
-						const m = repoUrl.match(/github\.com\/(.+?)\.git$/);
-						if (m) repoSlug = m[1];
-					}
-				} catch {}
 				if (repoSlug) {
 					readme = readme.replace(
 						/\]\(\.\/public\//g,
@@ -191,6 +193,13 @@ async function publishPackages(
 	}
 
 	createGitCommitAndTag(newVersion);
+
+	// After tagging, create or update a GitHub Release with notes from CHANGELOG
+	try {
+		createGithubRelease(newVersion, repoSlug);
+	} catch (e) {
+		console.warn("Skipping GitHub Release creation:", e);
+	}
 }
 
 // Get version bump type from command line arguments
@@ -198,3 +207,59 @@ const args = process.argv.slice(2);
 const versionBumpArg = args[0] || "patch"; // Default to patch
 
 publishPackages(versionBumpArg).catch(console.error);
+
+// -------------- helpers: GitHub Release --------------
+
+function hasGhCLI(): boolean {
+	try {
+		execSync("gh --version", { stdio: "ignore" });
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+function changelogSection(versionLike: string): string | null {
+	const file = path.resolve("CHANGELOG.md");
+	if (!fs.existsSync(file)) return null;
+	const text = fs.readFileSync(file, "utf8");
+	const re = new RegExp(
+		`^## \\\\[${versionLike.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&")}\\\\]` + "[\\s\\S]*?(?=^## \\\\[(?:.|\\n)*?\\\\]|\n\n?$)",
+		"m",
+	);
+	const m = text.match(re);
+	return m ? m[0].trim() + "\n" : null;
+}
+
+function ghReleaseExists(tag: string): boolean {
+	try {
+		execSync(`gh release view ${tag}`, { stdio: "ignore" });
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+function createGithubRelease(version: string, repoSlug: string) {
+	if (!hasGhCLI()) return;
+	const tag = `v${version}`;
+	const title = `codex-1up ${tag}`;
+	let notes = changelogSection(version);
+
+	// fallback: if no section for this semver (e.g., 0.1.1), try mapping to 0.4 if present
+	if (!notes) {
+		const alt = process.env.GH_NOTES_REF || "0.4";
+		notes = changelogSection(alt) || undefined;
+	}
+
+	const tmp = path.join(os.tmpdir(), `release-notes-${version}.md`);
+	if (notes) fs.writeFileSync(tmp, notes);
+
+	const exists = ghReleaseExists(tag);
+	const cmd = exists
+		? `gh release edit ${tag} --title "${title}" ${notes ? `--notes-file ${tmp}` : "--generate-notes"}`
+		: `gh release create ${tag} --title "${title}" ${notes ? `--notes-file ${tmp}` : "--generate-notes"}`;
+
+	console.log(`${exists ? "Updating" : "Creating"} GitHub Release ${tag}...`);
+	execSync(cmd, { stdio: "inherit" });
+}
