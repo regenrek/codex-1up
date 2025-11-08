@@ -6,6 +6,7 @@ import { promises as fs } from 'fs'
 import os from 'os'
 import { accessSync } from 'fs'
 import * as TOML from 'toml'
+import * as p from '@clack/prompts'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 function findRoot() {
@@ -36,6 +37,56 @@ export const installCommand = defineCommand({
   async run({ args }) {
     const installPath = resolve(repoRoot, 'install.sh')
     const flags: string[] = []
+
+
+    // If no flags and in an interactive TTY, offer a friendly guided install
+    const runWizard =
+      process.stdout.isTTY &&
+      !args['dry-run'] &&
+      !args['skip-confirmation'] &&
+      !args.yes &&
+      !args.vscode &&
+      !args['git-external-diff'] &&
+      !args['install-node'] &&
+      typeof args['agents-md'] === 'undefined' &&
+      !args['agents-template']
+
+    let chosenProfile: 'balanced'|'safe'|'minimal'|'yolo' = 'balanced'
+    let createGlobalAgents = false
+    let mode: 'recommended'|'manual' = 'recommended'
+
+    if (runWizard) {
+      p.intro('codex-1up · Guided install')
+      const m = await p.select({
+        message: 'Choose install mode',
+        options: [
+          { label: 'Recommended (most users)', value: 'recommended' },
+          { label: 'Manual (advanced)', value: 'manual' },
+        ],
+        initialValue: 'recommended'
+      }) as 'recommended'|'manual'
+      if (p.isCancel(m)) return p.cancel('Install aborted')
+      mode = m
+
+      if (mode === 'recommended') {
+        const prof = await p.select({
+          message: 'Active profile',
+          options: [
+            { label: 'balanced (default)', value: 'balanced' },
+            { label: 'safe', value: 'safe' },
+            { label: 'minimal', value: 'minimal' },
+            { label: 'yolo (risky)', value: 'yolo' },
+          ],
+          initialValue: 'balanced'
+        }) as 'balanced'|'safe'|'minimal'|'yolo'
+        if (p.isCancel(prof)) return p.cancel('Install aborted')
+        chosenProfile = prof
+
+        const ag = await p.confirm({ message: 'Create a global ~/.codex/AGENTS.md now?', initialValue: false })
+        if (p.isCancel(ag)) return p.cancel('Install aborted')
+        createGlobalAgents = Boolean(ag)
+      }
+    }
     if (args.yes) flags.push('--yes')
     if (args['dry-run']) flags.push('--dry-run')
     if (args['skip-confirmation']) flags.push('--skip-confirmation')
@@ -51,9 +102,20 @@ export const installCommand = defineCommand({
     }
     if (args['agents-template']) flags.push('--agents-template', String(args['agents-template']))
 
+    if (runWizard && mode === 'recommended') {
+      const s = p.spinner()
+      s.start('Installing prerequisites and writing config')
+      await execa('bash', [installPath, '--yes', '--skip-confirmation', ...flags], { stdio: 'inherit' })
+      s.stop('Base install complete')
+      await setActiveProfile(chosenProfile)
+      if (createGlobalAgents) { await writeGlobalAgents('default') }
+      p.outro('Install finished')
+      await printPostInstallSummary()
+      return
+    }
+
     const child = execa('bash', [installPath, ...flags], { stdio: 'inherit' })
     await child
-
     await printPostInstallSummary()
   }
 })
@@ -101,3 +163,21 @@ async function printPostInstallSummary() {
   lines.push('')
   process.stdout.write(lines.join('\n') + '\n')
 }
+
+
+async function setActiveProfile(name: 'balanced'|'safe'|'minimal'|'yolo') {
+  const cfgPath = resolve(os.homedir(), '.codex', 'config.toml')
+  try {
+    const raw = await fs.readFile(cfgPath, 'utf8')
+    const updated = setRootProfileInline(raw, name)
+    await fs.writeFile(cfgPath, updated, 'utf8')
+  } catch {}
+}
+
+async function writeGlobalAgents(template: 'default'|'typescript'|'python'|'shell') {
+  const dest = resolve(os.homedir(), '.codex', 'AGENTS.md')
+  const src = resolve(repoRoot, 'templates/agent-templates', `AGENTS-${template}.md`)
+  await fs.mkdir(resolve(os.homedir(), '.codex'), { recursive: true })
+  await fs.copyFile(src, dest)
+}
+

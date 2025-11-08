@@ -17,7 +17,8 @@
   "dependencies": {
     "citty": "^0.1.6",
     "execa": "^9.3.0",
-    "toml": "^3.0.0"
+    "toml": "^3.0.0",
+    "@clack/prompts": "^0.7.0"
   },
   "devDependencies": {
     "@types/node": "^22.8.5",
