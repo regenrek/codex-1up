@@ -607,13 +607,24 @@ write_codex_config() {
 ensure_notify_hook() {
   local notify_target="${HOME}/.codex/notify.sh"
   local template_src="${ROOT_DIR}/templates/notification.sh"
+  local notify_mode="${CODEX_1UP_UPDATE_NOTIFY:-}"
   mkdir -p "${HOME}/.codex"
+
+  if [ -n "$notify_mode" ] && [ "$notify_mode" != "yes" ]; then
+    info "Skipping notify hook installation"
+    return 0
+  fi
 
   if [ ! -f "$template_src" ]; then
     warn "Notification template missing at ${template_src}; skipping notify hook install"
   else
     if [ -f "$notify_target" ]; then
-      if ! $ASSUME_YES && ! $SKIP_CONFIRMATION; then
+      if [ "$notify_mode" = "yes" ]; then
+        cp "$notify_target" "${notify_target}.backup.$(date +%Y%m%d_%H%M%S)"
+        run cp "$template_src" "$notify_target"
+        run chmod +x "$notify_target"
+        ok "Updated notify hook (backup created)"
+      elif ! $ASSUME_YES && ! $SKIP_CONFIRMATION; then
         read -r -p "Update ~/.codex/notify.sh from template? (backup will be created) [y/N] " ans || ans="n"
         if [[ "$ans" =~ ^[Yy]$ ]]; then
           cp "$notify_target" "${notify_target}.backup.$(date +%Y%m%d_%H%M%S)"
@@ -631,27 +642,24 @@ ensure_notify_hook() {
     fi
   fi
 
-  # Enable in config: notify = ["<path>"] and tui.notifications = true
   local cfg="${HOME}/.codex/config.toml"
   if [ -f "$cfg" ]; then
-    # Ensure notify array contains our hook
     if grep -Eq '^\s*notify\s*=\s*\[' "$cfg"; then
       if ! grep -Fq "$notify_target" "$cfg"; then
-        # Append into existing array (naive but safe for simple arrays)
-        # shellcheck disable=SC2016
         perl -0777 -pe 's/^(\s*notify\s*=\s*\[)([^\]]*)\]/$1$2, "'"$notify_target"'"\]/ms if $1 && index($2, "'"$notify_target"'") == -1' -i "$cfg" || true
         ok "Added notify hook to config"
       fi
     else
-      printf '\nnotify = ["%s"]\n' "$notify_target" >>"$cfg"
+      printf '
+notify = ["%s"]
+' "$notify_target" >>"$cfg"
       ok "Enabled notify hook in config"
     fi
-
-    # Ensure dotted key tui.notifications = true (preferred)
     if grep -Eq '^\s*tui\.notifications\s*=' "$cfg"; then
-      sed -i.bak -E 's/^(\s*tui\.notifications\s*=\s*).*/\1true/' "$cfg" || true
+      sed -i.bak -E 's/^(\s*tui\.notifications\s*=\s*).*/true/' "$cfg" || true
     else
-      printf 'tui.notifications = true\n' >>"$cfg"
+      printf 'tui.notifications = true
+' >>"$cfg"
     fi
     ok "Enabled tui.notifications in config"
   else
@@ -661,10 +669,37 @@ ensure_notify_hook() {
 
 # Prompt to create a global AGENTS.md in ~/.codex
 maybe_prompt_global_agents() {
-  # Interactive selection similar to config profile flow
   local target_path="${HOME}/.codex/AGENTS.md"
+  local ga_mode="${CODEX_1UP_GLOBAL_AGENTS:-}"
 
-  # In fully non-interactive mode, skip creating global AGENTS.md
+  if [ "$ga_mode" = "skip" ]; then
+    info "Skipping global AGENTS.md creation"
+    return 0
+  fi
+
+  if [ "$ga_mode" = "create-default" ]; then
+    if [ -f "$target_path" ]; then
+      info "Global AGENTS.md already exists; leaving unchanged"
+      return 0
+    fi
+    run mkdir -p "${HOME}/.codex"
+    run cp "${ROOT_DIR}/templates/agent-templates/AGENTS-default.md" "$target_path"
+    ok "Wrote ${target_path}"
+    return 0
+  fi
+
+  if [ "$ga_mode" = "overwrite-default" ]; then
+    run mkdir -p "${HOME}/.codex"
+    if [ -f "$target_path" ]; then
+      local backup="${target_path}.backup.$(date +%Y%m%d_%H%M%S)"
+      run cp "$target_path" "$backup"
+      info "Backed up existing AGENTS.md to: ${backup}"
+    fi
+    run cp "${ROOT_DIR}/templates/agent-templates/AGENTS-default.md" "$target_path"
+    ok "Wrote ${target_path}"
+    return 0
+  fi
+
   if $SKIP_CONFIRMATION; then
     info "Skipping global AGENTS.md creation (non-interactive mode)"
     return 0
@@ -705,7 +740,6 @@ maybe_prompt_global_agents() {
       ;;
   esac
 
-  # User chose not to create
   if [ -z "$selected_template" ]; then
     info "Not creating ~/.codex/AGENTS.md"
     return 0
@@ -713,7 +747,6 @@ maybe_prompt_global_agents() {
 
   mkdir -p "${HOME}/.codex"
 
-  # If exists, ask to overwrite with backup
   if [ -f "$target_path" ]; then
     warn "${target_path} already exists"
     read -r -p "Overwrite existing file? (backup will be created) [y/N] " ans || ans="n"

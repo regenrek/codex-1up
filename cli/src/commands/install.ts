@@ -39,6 +39,10 @@ export const installCommand = defineCommand({
     const flags: string[] = []
     const cfgPath = resolve(os.homedir(), '.codex', 'config.toml')
     const cfgExists = await pathExists(cfgPath)
+    const notifyPath = resolve(os.homedir(), '.codex', 'notify.sh')
+    const notifyExists = await pathExists(notifyPath)
+    const globalAgentsPath = resolve(os.homedir(), '.codex', 'AGENTS.md')
+    const globalAgentsExists = await pathExists(globalAgentsPath)
     let overwriteConfig: 'yes' | 'no' | undefined
     let allowProfileUpdate = !cfgExists
 
@@ -55,8 +59,9 @@ export const installCommand = defineCommand({
       !args['agents-template']
 
     let chosenProfile: 'balanced'|'safe'|'minimal'|'yolo' = 'balanced'
-    let createGlobalAgents = false
     let mode: 'recommended'|'manual' = 'recommended'
+    let notifyAction: 'yes'|'no' | undefined
+    let globalAgentsAction: 'create-default'|'overwrite-default'|'skip' | undefined
 
     if (runWizard) {
       p.intro('codex-1up · Guided install')
@@ -98,9 +103,22 @@ export const installCommand = defineCommand({
           }
         }
 
-        const ag = await p.confirm({ message: 'Create a global ~/.codex/AGENTS.md now?', initialValue: false })
-        if (p.isCancel(ag)) return p.cancel('Install aborted')
-        createGlobalAgents = Boolean(ag)
+        const notifyMsg = notifyExists
+          ? 'Update ~/.codex/notify.sh from template? (backup will be created)'
+          : 'Install default ~/.codex/notify.sh (used for notifications)?'
+        const notifyResp = await p.confirm({ message: notifyMsg, initialValue: true })
+        if (p.isCancel(notifyResp)) return p.cancel('Install aborted')
+        notifyAction = notifyResp ? 'yes' : 'no'
+
+        if (!globalAgentsExists) {
+          const ag = await p.confirm({ message: 'Create a global ~/.codex/AGENTS.md now?', initialValue: false })
+          if (p.isCancel(ag)) return p.cancel('Install aborted')
+          globalAgentsAction = ag ? 'create-default' : 'skip'
+        } else {
+          const agOverwrite = await p.confirm({ message: 'Overwrite existing ~/.codex/AGENTS.md with default template? (backup will be created)', initialValue: false })
+          if (p.isCancel(agOverwrite)) return p.cancel('Install aborted')
+          globalAgentsAction = agOverwrite ? 'overwrite-default' : 'skip'
+        }
       }
     }
     if (args.yes) flags.push('--yes')
@@ -145,6 +163,9 @@ export const installCommand = defineCommand({
       s.start('Installing prerequisites and writing config')
       const env = { ...process.env, INSTALL_MODE: 'recommended' } as NodeJS.ProcessEnv
       if (overwriteConfig) env.CODEX_1UP_OVERWRITE_CONFIG = overwriteConfig
+      if (allowProfileUpdate) env.CODEX_1UP_ACTIVE_PROFILE = chosenProfile
+      if (notifyAction) env.CODEX_1UP_UPDATE_NOTIFY = notifyAction
+      if (globalAgentsAction) env.CODEX_1UP_GLOBAL_AGENTS = globalAgentsAction
       await execa('bash', [installPath, '--yes', '--skip-confirmation', ...flags], {
         stdio: 'inherit',
         env
@@ -155,7 +176,6 @@ export const installCommand = defineCommand({
       } else {
         p.log.info('Profile unchanged (existing config kept).')
       }
-      if (createGlobalAgents) { await writeGlobalAgents('default') }
       p.outro('Install finished')
       await printPostInstallSummary()
       return
@@ -221,12 +241,6 @@ async function setActiveProfile(name: 'balanced'|'safe'|'minimal'|'yolo') {
   } catch {}
 }
 
-async function writeGlobalAgents(template: 'default'|'typescript'|'python'|'shell') {
-  const dest = resolve(os.homedir(), '.codex', 'AGENTS.md')
-  const src = resolve(repoRoot, 'templates/agent-templates', `AGENTS-${template}.md`)
-  await fs.mkdir(resolve(os.homedir(), '.codex'), { recursive: true })
-  await fs.copyFile(src, dest)
-}
 
 async function pathExists(path: string) {
   try { await fs.access(path); return true } catch { return false }
