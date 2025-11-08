@@ -37,7 +37,10 @@ export const installCommand = defineCommand({
   async run({ args }) {
     const installPath = resolve(repoRoot, 'install.sh')
     const flags: string[] = []
-
+    const cfgPath = resolve(os.homedir(), '.codex', 'config.toml')
+    const cfgExists = await pathExists(cfgPath)
+    let overwriteConfig: 'yes' | 'no' | undefined
+    let allowProfileUpdate = !cfgExists
 
     // If no flags and in an interactive TTY, offer a friendly guided install
     const runWizard =
@@ -82,6 +85,19 @@ export const installCommand = defineCommand({
         if (p.isCancel(prof)) return p.cancel('Install aborted')
         chosenProfile = prof
 
+        if (cfgExists) {
+          const overwrite = await p.confirm({
+            message: 'Overwrite existing ~/.codex/config.toml with the latest template? (backup will be created)',
+            initialValue: false
+          })
+          if (p.isCancel(overwrite)) return p.cancel('Install aborted')
+          overwriteConfig = overwrite ? 'yes' : 'no'
+          allowProfileUpdate = overwrite
+          if (!overwrite) {
+            p.log.info('Keeping existing config (no overwrite).')
+          }
+        }
+
         const ag = await p.confirm({ message: 'Create a global ~/.codex/AGENTS.md now?', initialValue: false })
         if (p.isCancel(ag)) return p.cancel('Install aborted')
         createGlobalAgents = Boolean(ag)
@@ -103,11 +119,42 @@ export const installCommand = defineCommand({
     if (args['agents-template']) flags.push('--agents-template', String(args['agents-template']))
 
     if (runWizard && mode === 'recommended') {
+      // Safety summary: require explicit 'yes' acknowledgement
+      // Loop once if user does not type 'yes'
+      const summary = [
+        '',
+        'Recommended will install and configure:',
+        '  • Node.js (via nvm) if missing',
+        '  • Global npm: @openai/codex, @ast-grep/cli (install/upgrade)',
+        '  • Dev tools: fd/rg/fzf/jq/yq (+ difftastic if available)',
+        '  • ~/.codex/config.toml from template',
+        '  • ~/.codex/notify.sh and enable tui.notifications',
+        '  • Default sound: noti_1.wav (copied to ~/.codex/sounds)',
+        '  • Global AGENTS.md (default template) if you opted in',
+        ''
+      ].join('\n')
+      p.note(summary, 'Summary')
+      const ack = await p.text({
+        message: "Type 'yes' to continue with Recommended",
+        placeholder: 'yes',
+        validate(v) { return v === 'yes' ? undefined : "Please type exactly 'yes' to proceed" }
+      })
+      if (p.isCancel(ack)) return p.cancel('Install aborted')
+
       const s = p.spinner()
       s.start('Installing prerequisites and writing config')
-      await execa('bash', [installPath, '--yes', '--skip-confirmation', ...flags], { stdio: 'inherit' })
+      const env = { ...process.env, INSTALL_MODE: 'recommended' } as NodeJS.ProcessEnv
+      if (overwriteConfig) env.CODEX_1UP_OVERWRITE_CONFIG = overwriteConfig
+      await execa('bash', [installPath, '--yes', '--skip-confirmation', ...flags], {
+        stdio: 'inherit',
+        env
+      })
       s.stop('Base install complete')
-      await setActiveProfile(chosenProfile)
+      if (allowProfileUpdate) {
+        await setActiveProfile(chosenProfile)
+      } else {
+        p.log.info('Profile unchanged (existing config kept).')
+      }
       if (createGlobalAgents) { await writeGlobalAgents('default') }
       p.outro('Install finished')
       await printPostInstallSummary()
@@ -181,3 +228,6 @@ async function writeGlobalAgents(template: 'default'|'typescript'|'python'|'shel
   await fs.copyFile(src, dest)
 }
 
+async function pathExists(path: string) {
+  try { await fs.access(path); return true } catch { return false }
+}

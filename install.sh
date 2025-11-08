@@ -257,6 +257,223 @@ ensure_tools() {
   done
 }
 
+_detect_rc() {
+  local target="${SHELL_TARGET}"
+  if [ "$target" = "auto" ]; then
+    case "${SHELL:-}" in
+      *zsh*) target="zsh" ;;
+      *fish*) target="fish" ;;
+      *) target="bash" ;;
+    esac
+  fi
+  case "$target" in
+    zsh)  echo "${HOME}/.zshrc" ;;
+    fish) echo "${HOME}/.config/fish/config.fish" ;;
+    *)    echo "${HOME}/.bashrc" ;;
+  esac
+}
+
+_upsert_rc_block() {
+  local rc_file="$1"; shift
+  local content="$1"; shift || true
+  mkdir -p "$(dirname "$rc_file")"
+  if [ -f "$rc_file" ]; then
+    # Remove existing block (if any)
+    # shellcheck disable=SC2016
+    sed -i.bak -e "/>>> ${PROJECT} >>>/,/<<< ${PROJECT} <</d" "$rc_file" || true
+  fi
+  {
+    echo ">>> ${PROJECT} >>>"
+    echo "$content"
+    echo "<<< ${PROJECT} <<<"
+  } >> "$rc_file"
+}
+
+_pick_player_quick() {
+  if command -v afplay >/dev/null 2>&1; then echo "afplay"; return 0; fi
+  if command -v paplay >/dev/null 2>&1; then echo "paplay"; return 0; fi
+  if command -v aplay  >/dev/null 2>&1; then echo "aplay";  return 0; fi
+  if command -v mpg123 >/dev/null 2>&1; then echo "mpg123"; return 0; fi
+  if command -v ffplay >/dev/null 2>&1; then echo "ffplay -nodisp -autoexit"; return 0; fi
+  echo ""
+}
+
+_preview_sound() {
+  local path="$1"
+  [ -f "$path" ] || { warn "File not found: $path"; return 1; }
+  local player
+  player=$(_pick_player_quick)
+  if [ -z "$player" ]; then
+    warn "No audio player found (afplay/paplay/aplay/mpg123/ffplay). Skipping preview."
+    return 1
+  fi
+  info "Playing preview: ${path}"
+  # shellcheck disable=SC2086
+  $player "$path" >/dev/null 2>&1 < /dev/null &
+}
+
+maybe_setup_notification_sound() {
+  local src_dir="${ROOT_DIR}/sounds"
+  local target_dir="${HOME}/.codex/sounds"
+  mkdir -p "$target_dir"
+
+  # Recommended: set a sensible default (noti_1.wav) without prompting.
+  if [ "${INSTALL_MODE}" = "recommended" ]; then
+    local default_src="${src_dir}/noti_1.wav"
+    if [ -f "$default_src" ]; then
+      local dest="${target_dir}/noti_1.wav"
+      if $DRY_RUN; then echo "[dry-run] cp $default_src $dest"; else run cp "$default_src" "$dest"; fi
+      local rc="$(_detect_rc)"
+      local block
+      block=$(cat <<RC
+# Notification sound (recommended default)
+export CODEX_DISABLE_SOUND=0
+export CODEX_CUSTOM_SOUND="${dest}"
+RC
+)
+      info "Configuring default notification sound: noti_1.wav"
+      if $DRY_RUN; then echo "[dry-run] update $rc"; else _upsert_rc_block "$rc" "$block"; fi
+      ok "Default sound set. Open a new shell or source your rc to apply."
+    else
+      warn "Default sound not found at ${default_src}"
+    fi
+    # For recommended installs, we stop here.
+    if $ASSUME_YES || $SKIP_CONFIRMATION; then return 0; fi
+  fi
+
+  # Non-interactive manual installs: skip prompts
+  if $ASSUME_YES || $SKIP_CONFIRMATION; then
+    return 0
+  fi
+
+  local -a files=()
+  if [ -d "$src_dir" ]; then
+    while IFS= read -r -d '' f; do files+=("$f"); done < <(find "$src_dir" -type f \( -iname '*.wav' -o -iname '*.mp3' -o -iname '*.aiff' -o -iname '*.m4a' \) -print0 | sort -z)
+  fi
+
+  echo ""
+  info "Notification sound setup (optional)"
+  echo "Choose a default sound, provide a custom path, or disable sounds."
+  echo ""
+  if [ ${#files[@]} -gt 0 ]; then
+    echo "Bundled sounds:"
+    local i=1
+    for f in "${files[@]}"; do
+      printf "  %d) %s\n" "$i" "$(basename "$f")"
+      i=$((i+1))
+    done
+  else
+    echo "No bundled sounds found in ${src_dir}"
+  fi
+  echo "  c) custom path"
+  echo "  n) none (disable)"
+  echo ""
+
+  local sel_index=""
+  local sel_path=""
+
+  while :; do
+    printf "Select [1-%d|c|n] (p=preview, ENTER=skip): " ${#files[@]}
+    local choice=""
+    read -r choice || choice=""
+
+    case "$choice" in
+      "") info "Skipping sound setup"; return 0 ;;
+      p|P)
+        if [ -n "$sel_path" ]; then _preview_sound "$sel_path"; else warn "Pick a sound first, then press 'p' to preview."; fi
+        ;;
+      n|N)
+        local rc="$(_detect_rc)"
+        local block
+        block=$(cat <<'RC'
+# Notification sound disabled
+export CODEX_DISABLE_SOUND=1
+unset CODEX_CUSTOM_SOUND
+RC
+)
+        info "Disabling notification sounds (write to $(basename "$rc"))"
+        if $DRY_RUN; then echo "[dry-run] update $rc"; else _upsert_rc_block "$rc" "$block"; fi
+        ok "Sounds disabled. Open a new shell or source your rc to apply."
+        return 0
+        ;;
+      c|C)
+        printf "Enter absolute path to audio file: "
+        local p=""
+        read -r p || p=""
+        if [ -z "$p" ]; then warn "Empty path"; continue; fi
+        # Resolve to absolute path
+        if [ "${p#/}" = "$p" ]; then p="$(pwd)/$p"; fi
+        if [ ! -f "$p" ]; then warn "File not found: $p"; continue; fi
+        sel_path="$p"
+        echo "Selected custom: $sel_path"
+        # Confirm
+        while :; do
+          printf "(p)review, (y) use this, (r)eselect: "
+          local a=""
+          read -r a || a=""
+          case "$a" in
+            p|P) _preview_sound "$sel_path" ;;
+            r|R) break ;;
+            y|Y)
+              local rc="$(_detect_rc)"
+              local block
+              block=$(cat <<RC
+# Notification sound
+export CODEX_DISABLE_SOUND=0
+export CODEX_CUSTOM_SOUND="${sel_path}"
+RC
+)
+              info "Saving sound setting to $(basename "$rc")"
+              if $DRY_RUN; then echo "[dry-run] update $rc"; else _upsert_rc_block "$rc" "$block"; fi
+              ok "Set custom sound. Open a new shell or source your rc to apply."
+              return 0
+              ;;
+            *) : ;;
+          esac
+        done
+        ;;
+      * )
+        if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le ${#files[@]} ]; then
+          sel_index="$choice"
+          sel_path="${files[$((sel_index-1))]}"
+          echo "Selected: $(basename "$sel_path")"
+          # Offer preview and confirm copy/install
+          while :; do
+            printf "(p)review, (y) use this, (r)eselect: "
+            local a=""
+            read -r a || a=""
+            case "$a" in
+              p|P) _preview_sound "$sel_path" ;;
+              r|R) break ;;
+              y|Y)
+                local base
+                base="$(basename "$sel_path")"
+                local dest="${target_dir}/${base}"
+                if $DRY_RUN; then echo "[dry-run] cp $sel_path $dest"; else run cp "$sel_path" "$dest"; fi
+                local rc="$(_detect_rc)"
+                local block
+                block=$(cat <<RC
+# Notification sound
+export CODEX_DISABLE_SOUND=0
+export CODEX_CUSTOM_SOUND="${dest}"
+RC
+)
+                info "Saving sound setting to $(basename "$rc")"
+                if $DRY_RUN; then echo "[dry-run] update $rc"; else _upsert_rc_block "$rc" "$block"; fi
+                ok "Set sound to ${base}. Open a new shell or source your rc to apply."
+                return 0
+                ;;
+              *) : ;;
+            esac
+          done
+        else
+          warn "Invalid choice"
+        fi
+        ;;
+    esac
+  done
+}
+
 
 _select_active_profile() {
   local cfg_path="$1"
@@ -314,15 +531,95 @@ write_codex_config() {
   fi
 
   warn "~/.codex/config.toml already exists"
-  if confirm "Backup and overwrite with the latest unified template?"; then
+  local auto_choice="${CODEX_1UP_OVERWRITE_CONFIG:-}"
+  local parsed_auto=""
+  if [ -n "$auto_choice" ]; then
+    case "$auto_choice" in
+      [Yy]*) parsed_auto="yes" ;;
+      [Nn]*) parsed_auto="no" ;;
+    esac
+  fi
+
+  if [ "$parsed_auto" = "no" ]; then
+    info "Keeping existing config unchanged"
+    return 0
+  fi
+
+  local confirmed="false"
+  if [ "$parsed_auto" = "yes" ]; then
+    confirmed="true"
+  else
+    if confirm "Backup and overwrite with the latest unified template?"; then
+      confirmed="true"
+    else
+      info "Keeping existing config; you can manage profiles via the new CLI later."
+      return 0
+    fi
+  fi
+
+  if [ "$confirmed" = "true" ]; then
     local backup="${cfg}.backup.$(date +%Y%m%d_%H%M%S)"
     run cp "$cfg" "$backup"
     info "Backed up to ${backup}"
     if $DRY_RUN; then echo "[dry-run] cp $template_file $cfg"; else run cp "$template_file" "$cfg"; fi
     ok "Overwrote ~/.codex/config.toml with unified template"
     _select_active_profile "$cfg"
+  fi
+}
+
+# Ensure ~/.codex/notify.sh exists (from template) and config enables it
+ensure_notify_hook() {
+  local notify_target="${HOME}/.codex/notify.sh"
+  local template_src="${ROOT_DIR}/templates/notification.sh"
+  mkdir -p "${HOME}/.codex"
+
+  if [ ! -f "$template_src" ]; then
+    warn "Notification template missing at ${template_src}; skipping notify hook install"
   else
-    info "Keeping existing config; you can manage profiles via the new CLI later."
+    if [ -f "$notify_target" ]; then
+      if ! $ASSUME_YES && ! $SKIP_CONFIRMATION; then
+        read -r -p "Update ~/.codex/notify.sh from template? (backup will be created) [y/N] " ans || ans="n"
+        if [[ "$ans" =~ ^[Yy]$ ]]; then
+          cp "$notify_target" "${notify_target}.backup.$(date +%Y%m%d_%H%M%S)"
+          run cp "$template_src" "$notify_target"
+          run chmod +x "$notify_target"
+          ok "Updated notify hook (backup created)"
+        else
+          info "Keeping existing notify hook"
+        fi
+      fi
+    else
+      run cp "$template_src" "$notify_target"
+      run chmod +x "$notify_target"
+      ok "Installed notify hook to ~/.codex/notify.sh"
+    fi
+  fi
+
+  # Enable in config: notify = ["<path>"] and tui.notifications = true
+  local cfg="${HOME}/.codex/config.toml"
+  if [ -f "$cfg" ]; then
+    # Ensure notify array contains our hook
+    if grep -Eq '^\s*notify\s*=\s*\[' "$cfg"; then
+      if ! grep -Fq "$notify_target" "$cfg"; then
+        # Append into existing array (naive but safe for simple arrays)
+        # shellcheck disable=SC2016
+        perl -0777 -pe 's/^(\s*notify\s*=\s*\[)([^\]]*)\]/$1$2, "'"$notify_target"'"\]/ms if $1 && index($2, "'"$notify_target"'") == -1' -i "$cfg" || true
+        ok "Added notify hook to config"
+      fi
+    else
+      printf '\nnotify = ["%s"]\n' "$notify_target" >>"$cfg"
+      ok "Enabled notify hook in config"
+    fi
+
+    # Ensure dotted key tui.notifications = true (preferred)
+    if grep -Eq '^\s*tui\.notifications\s*=' "$cfg"; then
+      sed -i.bak -E 's/^(\s*tui\.notifications\s*=\s*).*/\1true/' "$cfg" || true
+    else
+      printf 'tui.notifications = true\n' >>"$cfg"
+    fi
+    ok "Enabled tui.notifications in config"
+  else
+    warn "Config not found at ${cfg}; run again after config is created"
   fi
 }
 
@@ -468,17 +765,40 @@ main() {
   local first_agents="${HOME}/.codex/AGENTS.md"
   if ! $ASSUME_YES && ! $SKIP_CONFIRMATION; then
     if [ ! -f "$first_cfg" ] && [ ! -f "$first_agents" ]; then
-      echo ""
-      info "Choose install mode:"
-      echo "  1) Recommended (most users) — sensible defaults; only asks on overwrite"
-      echo "  2) Manual (advanced) — confirm each optional step"
-      printf "Choose [1-2] (default: 1): "
-      local mode_choice="1"
-      read -r mode_choice || mode_choice="1"
-      case "$mode_choice" in
-        2|"manual"|"MANUAL") INSTALL_MODE="manual" ;;
-        *) INSTALL_MODE="recommended" ;;
-      esac
+      while :; do
+        echo ""
+        info "Choose install mode:"
+        echo "  1) Recommended (most users) — sensible defaults; only asks on overwrite"
+        echo "  2) Manual (advanced) — confirm each optional step"
+        printf "Choose [1-2] (default: 1): "
+        local mode_choice="1"
+        read -r mode_choice || mode_choice="1"
+        case "$mode_choice" in
+          2|"manual"|"MANUAL") INSTALL_MODE="manual"; break ;;
+          1|""|"recommended"|"RECOMMENDED"|*)
+            INSTALL_MODE="recommended"
+            echo ""
+            info "Recommended will install and configure:"
+            echo "  • Node.js (via nvm) if missing"
+            echo "  • Global npm: @openai/codex, @ast-grep/cli (install/upgrade)"
+            echo "  • Dev tools: fd/rg/fzf/jq/yq (+ difftastic if available)"
+            echo "  • ~/.codex/config.toml from template"
+            echo "  • ~/.codex/notify.sh and enable tui.notifications"
+            echo "  • Default sound: noti_1.wav (copied to ~/.codex/sounds)"
+            echo "  • Global AGENTS.md (default template) if not present"
+            [ -n "$VSCE_ID" ] && echo "  • VS Code extension: $VSCE_ID"
+            printf "Type 'yes' to continue with Recommended, anything else to reselect: "
+            local confirm_reco=""
+            read -r confirm_reco || confirm_reco=""
+            if [ "$confirm_reco" = "yes" ]; then
+              break
+            else
+              info "Okay, let's choose again."
+              continue
+            fi
+            ;;
+        esac
+      done
     fi
   fi
 
@@ -486,6 +806,8 @@ main() {
   install_npm_globals
   ensure_tools
   write_codex_config
+  ensure_notify_hook
+  maybe_setup_notification_sound
   maybe_prompt_global_agents
   maybe_install_vscode_ext
   maybe_write_agents
@@ -498,4 +820,3 @@ main() {
 }
 
 main "$@"
-
