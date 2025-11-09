@@ -3,7 +3,10 @@
 When you need to call tools from the shell, use this rubric:
 
 ## File Operations
-- Use `fd` for finding files: `fd --full-path '<pattern>' | head -n 1`
+- Find files by file name: `fd`
+- Find files with path name: `fd -p <file-path>`
+- List files in a directory: `fd . <directory>`
+- Find files with extension and pattern: `fd -e <extension> <pattern>`
 
 ## Structured Code Search
 - Find code structure: `ast-grep --lang <language> -p '<pattern>'`

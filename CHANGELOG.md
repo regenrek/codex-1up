@@ -2,6 +2,47 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.3] - 2025-11-09
+
+### Added
+- Interactive installer improvements (wizard is default in TTY):
+  - Overwrite config prompt first (default Yes), then profile selection.
+  - Notification sound picker with preview and options:
+    - Skip (leave current setup), None (disable sounds), noti_1–noti_5, Custom path…
+    - Custom accepts .wav/.mp3/.ogg and validates the absolute path exists.
+  - Preview uses the first available player (afplay/paplay/aplay/mpg123/ffplay).
+- Reasoning steps visible by default in generated config:
+  - `[tui].show_raw_agent_reasoning = true`
+  - `[tui].hide_agent_reasoning = false`
+
+### Changed
+- Simplified wizard (removed “Recommended” vs “Manual” step); `mode` is now always `manual` internally.
+- Template tweaks:
+  - `[features]` now starts with `web_search_request = true` for better defaults.
+  - Removed unsupported `model_reasoning_summary = "concise"` from the `minimal` profile.
+  - AGENTS template (`templates/agent-templates/AGENTS-default.md`): clarified `fd` usage
+    - Print absolute paths: `fd -p '<pattern>'`
+    - Match against full path: `fd --full-path '<pattern>'`
+    - Keep selections deterministic (prefer `--filter` + `head` over interactive TUIs)
+
+### Fixed
+- Config normalization for notifications:
+  - Ensures a single root `notify = ["~/.codex/notify.sh"]` and `[tui].notifications = true`.
+  - Removes stray root `notifications = …` and any misplaced keys under `profiles.*.features` that caused
+    `invalid type: sequence, expected a boolean`.
+- Sound application reliability:
+  - Patches `~/.codex/notify.sh` `DEFAULT_CODEX_SOUND` to the chosen file (or clears it when `None`) so
+    sounds work immediately before reloading the shell rc.
+
+### Packaging
+- Confirmed `templates/` and `sounds/` are included in the published package; installer now locates the
+  runtime root by walking upward until it finds `templates/codex-config.toml` (works from `dist/` installs).
+
+### Tests
+- Expanded suite (18+ tests) covering wizard flow, non‑interactive defaults, CLI arg mapping, config
+  normalization, bundled/custom sounds (including MP3/OGG), notify.sh patching, template write/switch, and
+  reasoning flags.
+
 ## [0.1.2] - 2025-11-08
 
 ### Fixed
