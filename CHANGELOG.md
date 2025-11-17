@@ -4,16 +4,20 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+_No changes yet._
+
+## [0.2.0] - 2025-11-18
+
 ### Changed
 - Installer respects PATH-first for Codex: skips installing `@openai/codex` when `codex` is already available on PATH.
-- Global Node installs now honor the user’s package manager without cross-installs:
+- Global Node installs now honor the user's package manager without cross-installs:
   - Prefer pnpm (only when its global bin is configured).
   - Use npm when pnpm is not present.
   - Never use yarn global to avoid surprises.
 - When pnpm is detected but its global bin is not configured, the installer skips global Node installs with a clear warning (suggests `pnpm setup`) instead of falling back and causing duplicates.
 
 ### Added
-- `doctor` now prints all `codex` candidates found on PATH (“--- codex paths ---”) to help diagnose duplicates.
+- `doctor` now prints all `codex` candidates found on PATH ("--- codex paths ---") to help diagnose duplicates.
 
 ## [0.1.5] - 2025-11-09
 
