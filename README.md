@@ -60,12 +60,16 @@ Switch profiles anytime: `codex --profile <name>` for a session, or `codex-1up c
 
 ## Global guidance with AGENTS.md (optional)
 
-You can keep a global guidance file at `~/.codex/AGENTS.md` that Codex will use across projects. During install, you’ll be prompted to create this; if you skip, you can create it later:
+**AGENTS.md** is an optional guidance file that tells Codex which tools to use for different tasks (e.g., `fd` for file finding, `ast-grep` for syntax-aware search, `jq` for JSON). A global `~/.codex/AGENTS.md` applies across all your projects, while per-repo `AGENTS.md` files can override it.
+
+**What gets installed:** A template file with tool selection guidelines covering file operations, code search, data processing, and best practices for deterministic, reproducible commands.
+
+**During install:** You'll be prompted to create `~/.codex/AGENTS.md`; you can skip this step. To create it later:
 
 ```bash
 # Create the directory if needed and write the template there
 mkdir -p ~/.codex
-./bin/codex-1up agents --path ~/.codex
+codex-1up agents --path ~/.codex
 # This writes ~/.codex/AGENTS.md
 ```
 
