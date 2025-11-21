@@ -1,6 +1,6 @@
 import { $ } from 'zx'
 import type { InstallerContext, PackageManager } from './types.js'
-import { needCmd, detectPackageManager, runCommand, chooseNodePmForGlobal } from './utils.js'
+import { needCmd, detectPackageManager, runCommand, chooseNodePmForGlobal, createPrivilegedPmCmd } from './utils.js'
 import * as path from 'path'
 import fs from 'fs-extra'
 
@@ -41,45 +41,78 @@ export async function ensureTools(ctx: InstallerContext): Promise<void> {
         })
         break
       case 'apt':
-        await runCommand('sudo', ['apt-get', 'update', '-y'], {
-          dryRun: ctx.options.dryRun,
-          logger: ctx.logger
-        })
-        await runCommand('sudo', ['apt-get', 'install', '-y', ...packages], {
-          dryRun: ctx.options.dryRun,
-          logger: ctx.logger
-        }).catch(() => {
-          // Some packages might fail, continue
-        })
-        // Try to install fd-find separately if fd not found
-        if (!(await needCmd('fd'))) {
-          await runCommand('sudo', ['apt-get', 'install', '-y', 'fd-find'], {
+        {
+          const { cmd: aptCmd, argsPrefix } = createPrivilegedPmCmd('apt-get')
+          try {
+            await runCommand(aptCmd, [...argsPrefix, 'update', '-y'], {
+              dryRun: ctx.options.dryRun,
+              logger: ctx.logger
+            })
+          } catch (error) {
+            ctx.logger.warn(
+              'apt-get update failed; install developer tools manually with "sudo apt-get update" followed by installs for ripgrep, fzf, jq, yq, git-delta, then re-run codex-1up if needed.'
+            )
+            break
+          }
+
+          for (const pkg of packages) {
+            try {
+              await runCommand(aptCmd, [...argsPrefix, 'install', '-y', pkg], {
+                dryRun: ctx.options.dryRun,
+                logger: ctx.logger
+              })
+            } catch {
+              ctx.logger.warn(
+                `apt-get install failed for ${pkg}; you can install it manually with "sudo apt-get install ${pkg}".`
+              )
+            }
+          }
+
+          // Try to install fd-find separately if fd not found
+          if (!(await needCmd('fd'))) {
+            try {
+              await runCommand(aptCmd, [...argsPrefix, 'install', '-y', 'fd-find'], {
+                dryRun: ctx.options.dryRun,
+                logger: ctx.logger
+              })
+            } catch {
+              ctx.logger.warn(
+                'apt-get install failed for fd-find; fd may not be available. Install manually if you prefer fd over fdfind.'
+              )
+            }
+          }
+        }
+        break
+      case 'dnf':
+        {
+          const { cmd: dnfCmd, argsPrefix } = createPrivilegedPmCmd('dnf')
+          await runCommand(dnfCmd, [...argsPrefix, 'install', '-y', ...packages], {
             dryRun: ctx.options.dryRun,
             logger: ctx.logger
           }).catch(() => {})
         }
         break
-      case 'dnf':
-        await runCommand('sudo', ['dnf', 'install', '-y', ...packages], {
-          dryRun: ctx.options.dryRun,
-          logger: ctx.logger
-        }).catch(() => {})
-        break
       case 'pacman':
-        await runCommand('sudo', ['pacman', '-Sy', '--noconfirm', ...packages], {
-          dryRun: ctx.options.dryRun,
-          logger: ctx.logger
-        }).catch(() => {})
+        {
+          const { cmd: pacmanCmd, argsPrefix } = createPrivilegedPmCmd('pacman')
+          await runCommand(pacmanCmd, [...argsPrefix, '-Sy', '--noconfirm', ...packages], {
+            dryRun: ctx.options.dryRun,
+            logger: ctx.logger
+          }).catch(() => {})
+        }
         break
       case 'zypper':
-        await runCommand('sudo', ['zypper', 'refresh'], {
-          dryRun: ctx.options.dryRun,
-          logger: ctx.logger
-        })
-        await runCommand('sudo', ['zypper', 'install', '-y', ...packages], {
-          dryRun: ctx.options.dryRun,
-          logger: ctx.logger
-        }).catch(() => {})
+        {
+          const { cmd: zypperCmd, argsPrefix } = createPrivilegedPmCmd('zypper')
+          await runCommand(zypperCmd, [...argsPrefix, 'refresh'], {
+            dryRun: ctx.options.dryRun,
+            logger: ctx.logger
+          })
+          await runCommand(zypperCmd, [...argsPrefix, 'install', '-y', ...packages], {
+            dryRun: ctx.options.dryRun,
+            logger: ctx.logger
+          }).catch(() => {})
+        }
         break
     }
   }
@@ -133,16 +166,40 @@ async function ensureAstGrep(ctx: InstallerContext, pm: PackageManager): Promise
         await runCommand('brew', ['install', 'ast-grep'], { dryRun: ctx.options.dryRun, logger: ctx.logger })
         return true
       case 'apt':
-        await runCommand('sudo', ['apt-get', 'install', '-y', 'ast-grep'], { dryRun: ctx.options.dryRun, logger: ctx.logger }).catch(() => {})
+        {
+          const { cmd, argsPrefix } = createPrivilegedPmCmd('apt-get')
+          await runCommand(cmd, [...argsPrefix, 'install', '-y', 'ast-grep'], {
+            dryRun: ctx.options.dryRun,
+            logger: ctx.logger
+          }).catch(() => {})
+        }
         return true
       case 'dnf':
-        await runCommand('sudo', ['dnf', 'install', '-y', 'ast-grep'], { dryRun: ctx.options.dryRun, logger: ctx.logger }).catch(() => {})
+        {
+          const { cmd, argsPrefix } = createPrivilegedPmCmd('dnf')
+          await runCommand(cmd, [...argsPrefix, 'install', '-y', 'ast-grep'], {
+            dryRun: ctx.options.dryRun,
+            logger: ctx.logger
+          }).catch(() => {})
+        }
         return true
       case 'pacman':
-        await runCommand('sudo', ['pacman', '-Sy', '--noconfirm', 'ast-grep'], { dryRun: ctx.options.dryRun, logger: ctx.logger }).catch(() => {})
+        {
+          const { cmd, argsPrefix } = createPrivilegedPmCmd('pacman')
+          await runCommand(cmd, [...argsPrefix, '-Sy', '--noconfirm', 'ast-grep'], {
+            dryRun: ctx.options.dryRun,
+            logger: ctx.logger
+          }).catch(() => {})
+        }
         return true
       case 'zypper':
-        await runCommand('sudo', ['zypper', 'install', '-y', 'ast-grep'], { dryRun: ctx.options.dryRun, logger: ctx.logger }).catch(() => {})
+        {
+          const { cmd, argsPrefix } = createPrivilegedPmCmd('zypper')
+          await runCommand(cmd, [...argsPrefix, 'install', '-y', 'ast-grep'], {
+            dryRun: ctx.options.dryRun,
+            logger: ctx.logger
+          }).catch(() => {})
+        }
         return true
       default:
         return false

@@ -27,6 +27,17 @@ export async function detectPackageManager(): Promise<PackageManager> {
   return 'none'
 }
 
+// Helper to construct a privileged package manager command.
+// On macOS/Homebrew we never require sudo here; for Linux package managers
+// we want to transparently support both root and non-root users:
+//   - If running as root, call the pm binary directly (e.g. "apt-get").
+//   - Otherwise, prefix with "sudo" (e.g. "sudo apt-get").
+export function createPrivilegedPmCmd(pmCmd: string): { cmd: string; argsPrefix: string[] } {
+  const isRoot = typeof process.getuid === 'function' && process.getuid() === 0
+  if (isRoot) return { cmd: pmCmd, argsPrefix: [] }
+  return { cmd: 'sudo', argsPrefix: [pmCmd] }
+}
+
 // Detect the user's Node package manager preference for global installs.
 // Preference: pnpm -> npm (we avoid yarn global to prevent surprises)
 
