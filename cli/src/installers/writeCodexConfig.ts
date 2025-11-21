@@ -58,8 +58,8 @@ export async function writeCodexConfig(ctx: InstallerContext): Promise<void> {
   const editor = new TomlEditor(initial)
   let touched = false
 
-  touched = applyProfiles(editor, ctx.options.profilesAction) || touched
-  touched = applyReasoning(editor, ctx.options.reasoning) || touched
+  touched = applyProfile(editor, ctx.options.profile, ctx.options.profileMode) || touched
+  touched = applyDefaultProfile(editor, ctx.options.profile, ctx.options.setDefaultProfile) || touched
   touched = applyNotifications(editor, ctx.options.notificationSound) || touched
 
   if (!touched) {
@@ -84,36 +84,29 @@ export async function writeCodexConfig(ctx: InstallerContext): Promise<void> {
   ctx.logger.ok('Updated ~/.codex/config.toml with requested settings.')
 }
 
-function applyProfiles(editor: TomlEditor, action: InstallerContext['options']['profilesAction']): boolean {
-  if (action === 'skip') return false
+function applyProfile(editor: TomlEditor, profile: InstallerContext['options']['profile'], mode: InstallerContext['options']['profileMode']): boolean {
+  if (profile === 'skip') return false
+  const defaults = PROFILE_DEFAULTS[profile]
   let changed = false
-  for (const profile of Object.keys(PROFILE_DEFAULTS) as Profile[]) {
-    const defaults = PROFILE_DEFAULTS[profile]
-    if (action === 'overwrite') {
-      changed = editor.replaceTable(`profiles.${profile}`, defaults.root) || changed
-      changed = editor.replaceTable(`profiles.${profile}.features`, defaults.features) || changed
-    } else {
-      editor.ensureTable(`profiles.${profile}`)
-      for (const [key, value] of defaults.root) {
-        changed = editor.setKey(`profiles.${profile}`, key, value, { mode: 'if-missing' }) || changed
-      }
-      editor.ensureTable(`profiles.${profile}.features`)
-      for (const [key, value] of defaults.features) {
-        changed = editor.setKey(`profiles.${profile}.features`, key, value, { mode: 'if-missing' }) || changed
-      }
+  if (mode === 'overwrite') {
+    changed = editor.replaceTable(`profiles.${profile}`, defaults.root) || changed
+    changed = editor.replaceTable(`profiles.${profile}.features`, defaults.features) || changed
+  } else {
+    editor.ensureTable(`profiles.${profile}`)
+    for (const [key, value] of defaults.root) {
+      changed = editor.setKey(`profiles.${profile}`, key, value, { mode: 'if-missing' }) || changed
+    }
+    editor.ensureTable(`profiles.${profile}.features`)
+    for (const [key, value] of defaults.features) {
+      changed = editor.setKey(`profiles.${profile}.features`, key, value, { mode: 'if-missing' }) || changed
     }
   }
   return changed
 }
 
-function applyReasoning(editor: TomlEditor, choice: InstallerContext['options']['reasoning']): boolean {
-  if (choice === 'off') {
-    return false
-  }
-  editor.ensureTable('tui')
-  const a = editor.setKey('tui', 'show_raw_agent_reasoning', 'true', { mode: 'force' })
-  const b = editor.setKey('tui', 'hide_agent_reasoning', 'false', { mode: 'force' })
-  return a || b
+function applyDefaultProfile(editor: TomlEditor, profile: InstallerContext['options']['profile'], setDefault: boolean): boolean {
+  if (!setDefault || profile === 'skip') return false
+  return editor.setRootKey('profile', `"${profile}"`, { mode: 'force' })
 }
 
 function applyNotifications(editor: TomlEditor, sound: string | undefined): boolean {
@@ -202,6 +195,29 @@ class TomlEditor {
     return this.text !== before
   }
 
+  setRootKey(key: string, value: string, options: SetKeyOptions): boolean {
+    const range = findRootRange(this.text)
+    const block = this.text.slice(range.start, range.end)
+    const regex = new RegExp(`^\\s*${escapeRegExp(key)}\\s*=.*$`, 'm')
+    const match = regex.exec(block)
+    if (match) {
+      if (options.mode === 'if-missing') return false
+      const before = this.text
+      const absStart = range.start + match.index
+      const absEnd = absStart + match[0].length
+      this.text = before.slice(0, absStart) + `${key} = ${value}` + before.slice(absEnd)
+      return this.text !== before
+    }
+    const before = this.text
+    const insertionPos = range.end
+    const needsLeading = insertionPos > 0 && !before.slice(0, insertionPos).endsWith('\n')
+    const tail = before.slice(insertionPos)
+    const needsTrailing = tail.length > 0 && !tail.startsWith('\n')
+    const line = `${needsLeading ? '\n' : ''}${key} = ${value}\n${needsTrailing ? '\n' : ''}`
+    this.text = before.slice(0, insertionPos) + line + tail
+    return this.text !== before
+  }
+
   private hasTable(table: string): boolean {
     return findTableRange(this.text, table) !== null
   }
@@ -222,6 +238,13 @@ function findTableRange(text: string, table: string): { start: number; end: numb
     }
   }
   return null
+}
+
+function findRootRange(text: string): { start: number; end: number } {
+  const regex = /^\s*\[([^\]]+)\]\s*$/gm
+  const firstMatch = regex.exec(text)
+  if (!firstMatch) return { start: 0, end: text.length }
+  return { start: 0, end: firstMatch.index }
 }
 
 function escapeRegExp(value: string): string {

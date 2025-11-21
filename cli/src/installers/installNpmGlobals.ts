@@ -2,16 +2,15 @@ import { $ } from 'zx'
 import type { InstallerContext } from './types.js'
 import { needCmd, runCommand, chooseNodePmForGlobal } from './utils.js'
 
-const REQUIRED_PACKAGES = ['@openai/codex', '@ast-grep/cli'] as const
-const AST_GREP_PKG = '@ast-grep/cli'
+const REQUIRED_PACKAGES = ['@openai/codex'] as const
 const CODEX_PKG = '@openai/codex'
 
-async function astGrepBinaryPresent(): Promise<boolean> {
-  return (await needCmd('sg')) || (await needCmd('ast-grep'))
-}
-
 export async function installNpmGlobals(ctx: InstallerContext): Promise<void> {
-  ctx.logger.info('Checking global packages (@openai/codex, @ast-grep/cli)')
+  if (ctx.options.installCodexCli === 'no') {
+    ctx.logger.info('Skipping Codex CLI install (user choice)')
+    return
+  }
+  ctx.logger.info('Checking global packages (@openai/codex)')
 
   const updates: string[] = []
 
@@ -42,14 +41,6 @@ export async function installNpmGlobals(ctx: InstallerContext): Promise<void> {
         installed = installedJson.dependencies?.[pkg]?.version || ''
       } catch {
         installed = ''
-      }
-
-      if (pkg === AST_GREP_PKG) {
-        const hasSystemBinary = await astGrepBinaryPresent()
-        if (hasSystemBinary && !installed) {
-          ctx.logger.ok('ast-grep already installed (found sg/ast-grep on PATH); skipping npm install')
-          continue
-        }
       }
 
       if (!installed) {
@@ -104,11 +95,5 @@ export async function installNpmGlobals(ctx: InstallerContext): Promise<void> {
     ctx.logger.ok('Codex CLI installed')
   } else {
     ctx.logger.err('Codex CLI not found after install')
-  }
-
-  if (await needCmd('ast-grep')) {
-    ctx.logger.ok('ast-grep installed')
-  } else {
-    ctx.logger.warn('ast-grep not found; check npm global path')
   }
 }

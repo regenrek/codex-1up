@@ -26,8 +26,11 @@ describe('install non-interactive defaults', () => {
     await installCommand.run!({ args: { yes: true, 'skip-confirmation': true } as any })
     expect(captured.length).toBeGreaterThan(0)
     const opts = captured.pop()
-    expect(opts.profilesAction).toBe('add')
-    expect(opts.reasoning).toBe('on')
+    expect(opts.profile).toBe('balanced')
+    expect(opts.profileMode).toBe('add')
+    expect(opts.setDefaultProfile).toBe(true)
+    expect(opts.installCodexCli).toBe('yes')
+    expect(opts.installTools).toBe('yes')
     expect(opts.mode).toBe('manual')
     // Global agents skipped by default
     expect(opts.globalAgents).toBe('skip')

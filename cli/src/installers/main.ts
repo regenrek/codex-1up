@@ -12,6 +12,7 @@ import { setupNotificationSound } from './setupNotificationSound.js'
 import { maybePromptGlobalAgents } from './maybePromptGlobalAgents.js'
 import { maybeInstallVscodeExt } from './maybeInstallVscodeExt.js'
 import { maybeWriteAgents } from './maybeWriteAgents.js'
+import { needCmd } from './utils.js'
 
 const PROJECT = 'codex-1up'
 
@@ -42,10 +43,20 @@ export async function runInstaller(options: InstallerOptions, rootDir: string): 
     await ensureNode(ctx)
     await installNpmGlobals(ctx)
     await ensureTools(ctx)
-    await writeCodexConfig(ctx)
-    await ensureNotifyHook(ctx)
-    await setupNotificationSound(ctx)
-    await maybePromptGlobalAgents(ctx)
+
+    const hasCodex = await needCmd('codex')
+    const configWritable = hasCodex || ctx.options.installCodexCli === 'yes'
+    if (!configWritable) {
+      logger.warn('Codex CLI not found and codex install was skipped; skipping config/notify setup until codex is installed.')
+    }
+
+    if (configWritable) {
+      await writeCodexConfig(ctx)
+      await ensureNotifyHook(ctx)
+      await setupNotificationSound(ctx)
+      await maybePromptGlobalAgents(ctx)
+    }
+
     await maybeInstallVscodeExt(ctx)
     await maybeWriteAgents(ctx)
 

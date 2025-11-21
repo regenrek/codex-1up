@@ -15,7 +15,8 @@ vi.mock('@clack/prompts', () => {
     confirm: vi.fn(async () => true),
     select: vi.fn(async ({ message, options }: any) => {
       const msg = String(message)
-      if (msg.includes('Install codex profiles')) return 'overwrite'
+      if (msg.includes('Choose a Codex profile')) return 'safe'
+      if (msg.startsWith('How should we write profiles.safe')) return 'overwrite'
       if (msg === 'Notification sound') return 'noti_1.wav'
       if (msg.startsWith('Selected:')) return 'use'
       if (msg.includes('Global ~/.codex/AGENTS.md')) return 'append-default'
@@ -54,8 +55,11 @@ describe('install wizard main flow', () => {
     await installCommand.run!({ args: {} as any })
     expect(captured.length).toBeGreaterThan(0)
     const opts = captured.pop()
-    expect(opts.profilesAction).toBe('overwrite')
-    expect(opts.reasoning).toBe('on')
+    expect(opts.profile).toBe('safe')
+    expect(opts.profileMode).toBe('overwrite')
+    expect(opts.setDefaultProfile).toBe(true)
+    expect(opts.installCodexCli).toBe('yes')
+    expect(opts.installTools).toBe('yes')
     expect(opts.notify).toBe('yes')
     expect(typeof opts.notificationSound).toBe('string')
     expect(opts.globalAgents).toBe('append-default')
@@ -69,7 +73,8 @@ describe('install wizard main flow', () => {
     const origSelect = prompts.select
     prompts.select = vi.fn(async ({ message, options }: any) => {
       const msg = String(message)
-      if (msg.includes('Install codex profiles')) return 'add'
+      if (msg.includes('Choose a Codex profile')) return 'balanced'
+      if (msg.startsWith('How should we write profiles.balanced')) return 'add'
       if (msg === 'Notification sound') return 'skip'
       if (msg.startsWith('Selected:')) return 'use'
       if (msg.includes('Global ~/.codex/AGENTS.md')) return 'skip'
@@ -77,7 +82,10 @@ describe('install wizard main flow', () => {
     })
     await installCommand.run!({ args: {} as any })
     const opts = captured.pop()
-    expect(opts.profilesAction).toBe('add')
+    expect(opts.profile).toBe('balanced')
+    expect(opts.profileMode).toBe('add')
+    expect(opts.installCodexCli).toBe('yes')
+    expect(opts.installTools).toBe('yes')
     expect(opts.notify).toBe('no')
     expect(opts.notificationSound).toBeUndefined()
     prompts.select = origSelect

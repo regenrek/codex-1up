@@ -1,11 +1,11 @@
 import { $ } from 'zx'
 import type { InstallerContext, PackageManager } from './types.js'
-import { needCmd, detectPackageManager, runCommand } from './utils.js'
+import { needCmd, detectPackageManager, runCommand, chooseNodePmForGlobal } from './utils.js'
 import * as path from 'path'
 import fs from 'fs-extra'
 
 const PACKAGE_MAP: Record<PackageManager, string[]> = {
-  brew: ['fd', 'ripgrep', 'fzf', 'jq', 'yq', 'difftastic'],
+  brew: ['fd', 'ripgrep', 'fzf', 'jq', 'yq', 'difftastic', 'ast-grep'],
   apt: ['ripgrep', 'fzf', 'jq', 'yq', 'git-delta'],
   dnf: ['ripgrep', 'fd-find', 'fzf', 'jq', 'yq', 'git-delta'],
   pacman: ['ripgrep', 'fd', 'fzf', 'jq', 'yq', 'git-delta'],
@@ -14,6 +14,10 @@ const PACKAGE_MAP: Record<PackageManager, string[]> = {
 }
 
 export async function ensureTools(ctx: InstallerContext): Promise<void> {
+  if (ctx.options.installTools === 'no') {
+    ctx.logger.info('Skipping developer tool installs (user choice)')
+    return
+  }
   const pm = await detectPackageManager()
   ctx.logger.info(`Detected package manager: ${pm}`)
 
@@ -93,6 +97,8 @@ export async function ensureTools(ctx: InstallerContext): Promise<void> {
     }
   }
 
+  await ensureAstGrep(ctx, pm)
+
   // Symlink fd on Debian/Ubuntu (fd-find)
   if (await needCmd('fdfind') && !(await needCmd('fd'))) {
     const localBin = path.join(ctx.homeDir, '.local', 'bin')
@@ -115,5 +121,46 @@ export async function ensureTools(ctx: InstallerContext): Promise<void> {
     if (await needCmd(tool)) {
       ctx.logger.ok(`${tool} ✓`)
     }
+  }
+}
+
+async function ensureAstGrep(ctx: InstallerContext, pm: PackageManager): Promise<void> {
+  if ((await needCmd('sg')) || (await needCmd('ast-grep'))) return
+
+  const installViaPm = async () => {
+    switch (pm) {
+      case 'brew':
+        await runCommand('brew', ['install', 'ast-grep'], { dryRun: ctx.options.dryRun, logger: ctx.logger })
+        return true
+      case 'apt':
+        await runCommand('sudo', ['apt-get', 'install', '-y', 'ast-grep'], { dryRun: ctx.options.dryRun, logger: ctx.logger }).catch(() => {})
+        return true
+      case 'dnf':
+        await runCommand('sudo', ['dnf', 'install', '-y', 'ast-grep'], { dryRun: ctx.options.dryRun, logger: ctx.logger }).catch(() => {})
+        return true
+      case 'pacman':
+        await runCommand('sudo', ['pacman', '-Sy', '--noconfirm', 'ast-grep'], { dryRun: ctx.options.dryRun, logger: ctx.logger }).catch(() => {})
+        return true
+      case 'zypper':
+        await runCommand('sudo', ['zypper', 'install', '-y', 'ast-grep'], { dryRun: ctx.options.dryRun, logger: ctx.logger }).catch(() => {})
+        return true
+      default:
+        return false
+    }
+  }
+
+  const attemptedPm = await installViaPm()
+  if ((await needCmd('sg')) || (await needCmd('ast-grep'))) return
+
+  // Fallback: npm global install
+  const nodePm = await chooseNodePmForGlobal(ctx.logger)
+  if (nodePm === 'pnpm') {
+    ctx.logger.info('Installing ast-grep via pnpm -g')
+    await runCommand('pnpm', ['add', '-g', '@ast-grep/cli'], { dryRun: ctx.options.dryRun, logger: ctx.logger })
+  } else if (nodePm === 'npm') {
+    ctx.logger.info('Installing ast-grep via npm -g')
+    await runCommand('npm', ['install', '-g', '@ast-grep/cli'], { dryRun: ctx.options.dryRun, logger: ctx.logger })
+  } else if (!attemptedPm) {
+    ctx.logger.warn('ast-grep not installed (no supported package manager or global npm). Install manually from https://ast-grep.github.io/')
   }
 }

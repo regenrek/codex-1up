@@ -40,8 +40,10 @@ export const installCommand = defineCommand({
     'no-vscode': { type: 'boolean', description: 'Skip VS Code extension checks' },
     'git-external-diff': { type: 'boolean', description: 'Set difftastic as git external diff' },
     'install-node': { type: 'string', description: 'nvm|brew|skip' },
-    profiles: { type: 'string', description: 'add|overwrite|skip (installer config profiles)' },
-    reasoning: { type: 'string', description: 'on|off for reasoning steps visibility' },
+    tools: { type: 'string', description: 'yes|no install/upgrade core CLI tools (rg, fd, fzf, jq, yq, difftastic)' },
+    'codex-cli': { type: 'string', description: 'yes|no install/upgrade Codex CLI + ast-grep globally' },
+    profile: { type: 'string', description: 'balanced|safe|minimal|yolo|skip (choose profile to write)' },
+    'profile-mode': { type: 'string', description: 'add|overwrite (profile table merge strategy)' },
     sound: { type: 'string', description: 'Sound file, "none", or "skip" to leave unchanged' },
     'agents-md': { type: 'string', description: 'Write starter AGENTS.md to PATH (default PWD/AGENTS.md)', required: false }
   },
@@ -52,19 +54,27 @@ export const installCommand = defineCommand({
     const notifyExists = await pathExists(notifyPath)
     const globalAgentsPath = resolve(os.homedir(), '.codex', 'AGENTS.md')
     const globalAgentsExists = await pathExists(globalAgentsPath)
+    const currentProfile = cfgExists ? await readCurrentProfile(cfgPath) : undefined
     // Interactive by default when in a TTY and not explicitly suppressed.
     const runWizard = process.stdout.isTTY && !args['dry-run'] && !args['skip-confirmation'] && !args.yes
 
-    const cliProfilesAction = normalizeProfilesArg(args.profiles)
-    const cliReasoningChoice = normalizeReasoningArg(args.reasoning)
+    const cliProfileChoice = normalizeProfileArg(args.profile)
+    const cliProfileMode = normalizeProfileMode(args['profile-mode'])
+    const cliToolsChoice = normalizeToolsArg(args.tools)
+    const cliCodexCliChoice = normalizeYesNoArg(args['codex-cli'])
+    const isUnixLike = process.platform === 'darwin' || process.platform === 'linux'
     const cliSoundArg = typeof args.sound === 'undefined'
       ? undefined
       : String(args.sound).trim()
 
     if (cliSoundArg === '') throw new Error('Invalid --sound value (expected path, "none", or "skip")')
 
-    let profilesAction: 'add'|'overwrite'|'skip' = cliProfilesAction || 'add'
-    let reasoningChoice: 'on'|'off' = cliReasoningChoice || 'on'
+    const seededProfile = cliProfileChoice || (isProfile(currentProfile) ? currentProfile : undefined) || 'balanced'
+    let profileChoice: 'balanced'|'safe'|'minimal'|'yolo'|'skip' = seededProfile
+    let profileMode: 'add'|'overwrite' = cliProfileMode || 'add'
+    let setDefaultProfile = true
+    let installTools: 'yes'|'no' = cliToolsChoice || (isUnixLike ? 'yes' : 'no')
+    let installCodexCli: 'yes'|'no' = cliCodexCliChoice || 'yes'
     let notifyAction: 'yes'|'no' | undefined
     let globalAgentsAction: 'create-default'|'overwrite-default'|'append-default'|'skip' | undefined
     let notificationSound: string | undefined
@@ -84,28 +94,73 @@ export const installCommand = defineCommand({
 
     if (runWizard) {
       p.intro('codex-1up · Install')
-      // Config patches: profiles + reasoning toggles
-      if (!cliProfilesAction) {
-        const profileResponse = await p.select({
-          message: 'Install codex profiles (balanced, safe, minimal, yolo)?',
-          options: [
-            { label: 'Add / merge (recommended)', value: 'add' },
-            { label: 'Overwrite codex profiles', value: 'overwrite' },
-            { label: 'Skip profiles', value: 'skip' }
-          ],
-          initialValue: 'add'
-        }) as 'add'|'overwrite'|'skip'
-        if (p.isCancel(profileResponse)) return p.cancel('Install aborted')
-        profilesAction = profileResponse
-      }
-
-      if (!cliReasoningChoice) {
-        const reasoningResponse = await p.confirm({
-          message: 'Enable reasoning steps (show raw agent reasoning)?',
+      if (!cliCodexCliChoice) {
+        const codexCliResponse = await p.confirm({
+          message: 'Install/update Codex CLI globally?',
           initialValue: true
         })
-        if (p.isCancel(reasoningResponse)) return p.cancel('Install aborted')
-        reasoningChoice = reasoningResponse ? 'on' : 'off'
+        if (p.isCancel(codexCliResponse)) return p.cancel('Install aborted')
+        installCodexCli = codexCliResponse ? 'yes' : 'no'
+      }
+
+      if (isUnixLike && !cliToolsChoice) {
+        p.note('We can install/update developer tools (rg, fd, fzf, jq, yq, difftastic, ast-grep) using your package manager (macOS/Linux).')
+        const toolsResponse = await p.confirm({
+          message: 'Install/update these CLI tools?',
+          initialValue: true
+        })
+        if (p.isCancel(toolsResponse)) return p.cancel('Install aborted')
+        installTools = toolsResponse ? 'yes' : 'no'
+      } else if (!isUnixLike && !cliToolsChoice) {
+        installTools = 'no'
+      }
+
+      // Profile selection + mode + default
+      if (!cliProfileChoice) {
+        p.note([
+          'Profiles:',
+          '  • Balanced: on-request approvals, workspace-write sandbox, web search on.',
+          '  • Safe: on-failure approvals, workspace-write, web search off.',
+          '  • Minimal: lean settings, minimal reasoning effort, web search off.',
+          '  • YOLO: never approvals, danger-full-access, web search on, verbose.'
+        ].join('\n'))
+        const profileResponse = await p.select({
+          message: 'Choose a Codex profile to install',
+          options: [
+            { label: 'Balanced (recommended)', value: 'balanced', hint: 'on-request approvals · workspace-write · web search on' },
+            { label: 'Safe', value: 'safe', hint: 'on-failure approvals · workspace-write · web search off' },
+            { label: 'Minimal', value: 'minimal', hint: 'lean defaults · minimal reasoning effort · web search off' },
+            { label: 'YOLO', value: 'yolo', hint: 'never approvals · danger-full-access · web search on' },
+            { label: 'Skip (no profile changes)', value: 'skip' }
+          ],
+          initialValue: initialProfileValue(currentProfile) as any
+        }) as 'balanced'|'safe'|'minimal'|'yolo'|'skip'
+        if (p.isCancel(profileResponse)) return p.cancel('Install aborted')
+        profileChoice = profileResponse
+      }
+
+      if (profileChoice !== 'skip' && !cliProfileMode) {
+        const modeResponse = await p.select({
+          message: `How should we write profiles.${profileChoice}?`,
+          options: [
+            { label: 'Add / merge (preserve custom keys)', value: 'add' },
+            { label: 'Overwrite codex profile (replace table)', value: 'overwrite' }
+          ],
+          initialValue: profileMode
+        }) as 'add'|'overwrite'
+        if (p.isCancel(modeResponse)) return p.cancel('Install aborted')
+        profileMode = modeResponse
+      }
+
+      if (profileChoice === 'skip') {
+        setDefaultProfile = false
+      } else {
+        const defaultResponse = await p.confirm({
+          message: `Wrote profiles.${profileChoice} to ~/.codex/config.toml (mode: ${profileMode}). Set this as the default profile?`,
+          initialValue: true
+        })
+        if (p.isCancel(defaultResponse)) return p.cancel('Install aborted')
+        setDefaultProfile = Boolean(defaultResponse)
       }
 
       // Notification sound: choose + preview loop
@@ -210,6 +265,9 @@ export const installCommand = defineCommand({
     }
 
     if (!runWizard) {
+      if (profileChoice === 'skip') {
+        setDefaultProfile = false
+      }
       if (typeof notifyAction === 'undefined') {
         notifyAction = notifyExists ? 'no' : 'yes'
       }
@@ -219,8 +277,11 @@ export const installCommand = defineCommand({
     }
 
     const installerOptions: InstallerOptions = {
-      profilesAction,
-      reasoning: reasoningChoice,
+      profile: profileChoice,
+      profileMode,
+      setDefaultProfile,
+      installCodexCli,
+      installTools,
       notify: notifyAction ?? (notifyExists ? 'no' : 'yes'),
       globalAgents: globalAgentsAction ?? 'skip',
       notificationSound,
@@ -296,7 +357,7 @@ async function printPostInstallSummary() {
   lines.push('────────────────────────────────')
   lines.push(`Config: ${cfgPath}${profile ? ` (active profile: ${profile})` : ''}`)
   if (profiles.length) lines.push(`Profiles: ${profiles.join(', ')}`)
-    lines.push(`Tools detected: ${present.join(', ') || 'none'}`)
+  lines.push(`Tools detected: ${present.join(', ') || 'none'}`)
   lines.push('')
   lines.push('Usage:')
   lines.push('  - Switch profile for a session:  codex --profile <name>')
@@ -330,18 +391,51 @@ async function pathExists(path: string) {
   try { await fs.access(path); return true } catch { return false }
 }
 
-function normalizeProfilesArg(value: unknown): ('add'|'overwrite'|'skip') | undefined {
+function normalizeProfileArg(value: unknown): ('balanced'|'safe'|'minimal'|'yolo'|'skip') | undefined {
   if (value === undefined || value === null) return undefined
   const normalized = String(value).toLowerCase()
-  if (normalized === 'add' || normalized === 'overwrite' || normalized === 'skip') return normalized
-  if (normalized === 'no') return 'skip'
-  throw new Error('Invalid --profiles value (use add|overwrite|skip|no).')
+  if (isProfile(normalized)) return normalized
+  if (normalized === 'skip') return 'skip'
+  throw new Error('Invalid --profile value (use balanced|safe|minimal|yolo|skip).')
 }
 
-function normalizeReasoningArg(value: unknown): ('on'|'off') | undefined {
+function normalizeProfileMode(value: unknown): ('add'|'overwrite') | undefined {
   if (value === undefined || value === null) return undefined
   const normalized = String(value).toLowerCase()
-  if (['on', 'true', 'yes'].includes(normalized)) return 'on'
-  if (['off', 'false', 'no'].includes(normalized)) return 'off'
-  throw new Error('Invalid --reasoning value (use on|off).')
+  if (normalized === 'add' || normalized === 'overwrite') return normalized
+  throw new Error('Invalid --profile-mode value (use add|overwrite).')
+}
+
+function normalizeToolsArg(value: unknown): ('yes'|'no') | undefined {
+  if (value === undefined || value === null) return undefined
+  const normalized = String(value).toLowerCase()
+  if (normalized === 'yes' || normalized === 'no') return normalized
+  throw new Error('Invalid --tools value (use yes|no).')
+}
+
+function normalizeYesNoArg(value: unknown): ('yes'|'no') | undefined {
+  if (value === undefined || value === null) return undefined
+  const normalized = String(value).toLowerCase()
+  if (normalized === 'yes' || normalized === 'no') return normalized
+  throw new Error('Expected yes|no')
+}
+
+function isProfile(value: unknown): value is 'balanced'|'safe'|'minimal'|'yolo' {
+  return value === 'balanced' || value === 'safe' || value === 'minimal' || value === 'yolo'
+}
+
+function initialProfileValue(currentProfile: string | undefined): 'balanced'|'safe'|'minimal'|'yolo'|'skip' {
+  if (isProfile(currentProfile)) return currentProfile
+  return 'balanced'
+}
+
+async function readCurrentProfile(cfgPath: string): Promise<string | undefined> {
+  try {
+    const raw = await fs.readFile(cfgPath, 'utf8')
+    const data: any = TOML.parse(raw)
+    const value = data.profile
+    return typeof value === 'string' ? value : undefined
+  } catch {
+    return undefined
+  }
 }

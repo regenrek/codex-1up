@@ -6,6 +6,22 @@ All notable changes to this project will be documented in this file.
 
 _No changes yet._
 
+## [0.2.3] - 2025-11-21
+
+### Added
+- Installer prompts for Codex CLI installation (`--codex-cli yes|no`) and a tools prompt for rg/fd/fzf/jq/yq/difftastic/ast-grep on macOS/Linux (`--tools yes|no`), with defaults that match the platform.
+- Profile picker now shows brief per-profile summaries and hints to clarify approvals, sandbox, and web search behavior before selection.
+
+### Changed
+- Ast-grep installation is consolidated into the tools step (package manager first, npm fallback) and removed from the Codex CLI install path.
+- Config/notify setup is skipped when Codex is absent and the user opted out of installing it, preventing writes that wouldn’t be usable.
+- Codex install precedes config writes so new users get a working CLI before config patches apply.
+- Simplified installer flags: `--profile` + `--profile-mode` replace the old profiles/reasoning flags; reasoning prompt removed since profiles carry defaults.
+- Profile write prompt clarifies add/merge vs overwrite behavior for the selected profile table only.
+
+### Fixed
+- Tools prompt messaging no longer double-lists ast-grep when Codex CLI prompt is shown separately.
+
 ## [0.2.2] - 2025-11-21
 
 ### Changed

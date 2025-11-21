@@ -1,15 +1,20 @@
 export type Profile = 'balanced' | 'safe' | 'minimal' | 'yolo'
+export type ProfileSelection = Profile | 'skip'
+export type ProfileMode = 'add' | 'overwrite'
 export type InstallMode = 'recommended' | 'manual'
-export type ProfilesAction = 'add' | 'overwrite' | 'skip'
-export type ReasoningChoice = 'on' | 'off'
 export type NotifyAction = 'yes' | 'no'
 export type GlobalAgentsAction = 'create-default' | 'overwrite-default' | 'append-default' | 'skip'
 export type InstallNodeMethod = 'nvm' | 'brew' | 'skip'
 export type PackageManager = 'brew' | 'apt' | 'dnf' | 'pacman' | 'zypper' | 'none'
+export type InstallToolsChoice = 'yes' | 'no'
+export type InstallCodexCliChoice = 'yes' | 'no'
 
 export interface InstallerOptions {
-  profilesAction: ProfilesAction
-  reasoning: ReasoningChoice
+  profile: ProfileSelection
+  profileMode: ProfileMode
+  setDefaultProfile: boolean
+  installTools: InstallToolsChoice
+  installCodexCli: InstallCodexCliChoice
   notify: NotifyAction | undefined
   globalAgents: GlobalAgentsAction | undefined
   notificationSound?: string | undefined // 'none' to disable

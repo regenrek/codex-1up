@@ -15,7 +15,10 @@ const logger: Logger = { log:()=>{}, info:()=>{}, ok:()=>{}, warn:()=>{}, err:()
 
 function makeCtx(sound: string): InstallerContext {
   const options: InstallerOptions = {
-    profilesAction: 'add', reasoning: 'on', notify: 'yes', globalAgents: 'skip',
+    profile: 'balanced', profileMode: 'add', setDefaultProfile: false,
+    installCodexCli: 'yes',
+    installTools: 'no',
+    notify: 'yes', globalAgents: 'skip',
     mode: 'manual', installNode: 'skip', shell: 'auto', vscodeId: undefined,
     noVscode: true, agentsMd: undefined, dryRun: false, assumeYes: true, skipConfirmation: true,
     notificationSound: sound

@@ -10,8 +10,11 @@ const repoRoot = resolve(__dirname, '../../')
 
 function makeOptions(overrides: Partial<InstallerOptions> = {}): InstallerOptions {
   return {
-    profilesAction: 'add',
-    reasoning: 'on',
+    profile: 'balanced',
+    profileMode: 'add',
+    setDefaultProfile: false,
+    installCodexCli: 'yes',
+    installTools: 'no',
     notify: 'yes',
     globalAgents: 'skip',
     notificationSound: undefined,
@@ -50,8 +53,8 @@ describe('writeCodexConfig targeted patches', () => {
   it('adds missing profile keys in add mode without removing custom values', async () => {
     const initial = `# existing config\n[profiles.balanced]\napproval_policy = "custom"\n\n`
     const { ctx, cfgPath, cleanup } = await setupContext(initial)
-    ctx.options.profilesAction = 'add'
-    ctx.options.reasoning = 'off'
+    ctx.options.profile = 'balanced'
+    ctx.options.profileMode = 'add'
     await writeCodexConfig(ctx)
     const data = await fs.readFile(cfgPath, 'utf8')
     expect(data).toMatch(/\[profiles\.balanced\][\s\S]*approval_policy\s*=\s*"custom"/)
@@ -65,8 +68,8 @@ describe('writeCodexConfig targeted patches', () => {
   it('overwrites codex profiles when requested', async () => {
     const initial = `# config\n[profiles.safe]\napproval_policy = "custom"\nextra_key = 1\n\n`
     const { ctx, cfgPath, cleanup } = await setupContext(initial)
-    ctx.options.profilesAction = 'overwrite'
-    ctx.options.reasoning = 'off'
+    ctx.options.profile = 'safe'
+    ctx.options.profileMode = 'overwrite'
     await writeCodexConfig(ctx)
     const data = await fs.readFile(cfgPath, 'utf8')
     expect(data).toMatch(/\[profiles\.safe\][\s\S]*approval_policy\s*=\s*"on-failure"/)
@@ -77,15 +80,15 @@ describe('writeCodexConfig targeted patches', () => {
     await cleanup()
   })
 
-  it('enables reasoning toggles when requested', async () => {
-    const initial = `model = "gpt"\n`
+  it('sets the root profile when requested', async () => {
+    const initial = `model = "gpt"\nprofile = "minimal"\n`
     const { ctx, cfgPath, cleanup } = await setupContext(initial)
-    ctx.options.profilesAction = 'skip'
-    ctx.options.reasoning = 'on'
+    ctx.options.profile = 'yolo'
+    ctx.options.profileMode = 'add'
+    ctx.options.setDefaultProfile = true
     await writeCodexConfig(ctx)
     const data = await fs.readFile(cfgPath, 'utf8')
-    expect(data).toMatch(/\[tui\][\s\S]*show_raw_agent_reasoning\s*=\s*true/)
-    expect(data).toMatch(/\[tui\][\s\S]*hide_agent_reasoning\s*=\s*false/)
+    expect(data).toMatch(/profile\s*=\s*"yolo"/)
     await cleanup()
   })
 
@@ -93,8 +96,7 @@ describe('writeCodexConfig targeted patches', () => {
     const initial = `[tui]\nnotifications = ["agent-turn-complete"]\n`
     const { ctx, cfgPath, cleanup } = await setupContext(initial)
     ctx.options.notificationSound = 'noti.wav'
-    ctx.options.reasoning = 'off'
-    ctx.options.profilesAction = 'skip'
+    ctx.options.profile = 'skip'
     await writeCodexConfig(ctx)
     const data = await fs.readFile(cfgPath, 'utf8')
     expect(data).toContain('notifications = ["agent-turn-complete"]')
@@ -105,8 +107,7 @@ describe('writeCodexConfig targeted patches', () => {
     const initial = `[tui]\nnotifications = false\n`
     const { ctx, cfgPath, cleanup } = await setupContext(initial)
     ctx.options.notificationSound = 'ding.wav'
-    ctx.options.reasoning = 'off'
-    ctx.options.profilesAction = 'skip'
+    ctx.options.profile = 'skip'
     await writeCodexConfig(ctx)
     const data = await fs.readFile(cfgPath, 'utf8')
     expect(data).toMatch(/\[tui\][\s\S]*notifications\s*=\s*true/)
