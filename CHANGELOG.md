@@ -6,6 +6,24 @@ All notable changes to this project will be documented in this file.
 
 _No changes yet._
 
+## [0.2.6] - 2025-11-21
+
+### Added
+- Added `--profiles-scope` option to install command for profile management (global vs local)
+- Added GitHub Actions workflows for CI/CD (cli-test.yml, cli-pr.yml, pkg-pr-new.yml)
+- Added `--no-vscode` flag to skip VS Code extension checks during installation
+
+### Changed
+- Enhanced package manager command handling: installer now transparently supports both root and non-root users on Linux
+  - If running as root, package manager commands run directly (e.g., `apt-get`)
+  - If not root, commands are prefixed with `sudo` (e.g., `sudo apt-get`)
+  - If sudo fails, installer gracefully skips tool installations with a warning
+- Improved error handling and user feedback for failed package installations
+- Updated README to clarify Linux installation requirements and sudo behavior
+
+### Fixed
+- Package manager commands now handle privilege escalation correctly across all Linux package managers (apt, dnf, pacman, zypper)
+
 ## [0.2.5] - 2025-11-21
 
 ### Changed
