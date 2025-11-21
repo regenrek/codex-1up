@@ -2,7 +2,7 @@
 # Adjust to your liking. See Codex CLI docs for full options.
 
 # Core (root defaults)
-model = "gpt-5.1-codex-max"
+model = "gpt-5.1-codex"
 approval_policy = "on-request"       # untrusted|on-failure|on-request|never
 sandbox_mode   = "workspace-write"   # read-only|workspace-write|danger-full-access
 profile = "balanced"                 # active profile: balanced|safe|minimal|yolo
@@ -40,7 +40,7 @@ enable_experimental_windows_sandbox = false
 [profiles.balanced]
 approval_policy = "on-request"
 sandbox_mode = "workspace-write"
-model = "gpt-5.1-codex-max"
+model = "gpt-5.1-codex"
 model_reasoning_effort = "medium"
 [profiles.balanced.features]
 web_search_request = true
@@ -48,13 +48,13 @@ web_search_request = true
 [profiles.safe]
 approval_policy = "on-failure"
 sandbox_mode = "workspace-write"
-model = "gpt-5.1-codex-max"
+model = "gpt-5.1-codex"
 model_reasoning_effort = "medium"
 [profiles.safe.features]
 web_search_request = false
 
 [profiles.minimal]
-model = "gpt-5.1-codex-max"
+model = "gpt-5.1-codex"
 model_reasoning_effort = "medium"
 [profiles.minimal.features]
 web_search_request = false
@@ -62,7 +62,7 @@ web_search_request = false
 [profiles.yolo]
 approval_policy = "never"
 sandbox_mode = "danger-full-access"
-model = "gpt-5.1-codex-max"
+model = "gpt-5.1-codex"
 model_reasoning_effort = "medium"
 model_reasoning_summary = "detailed"
 model_verbosity = "high"
