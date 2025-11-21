@@ -86,6 +86,7 @@ See memory behavior with AGENTS.md in the official docs: [Memory with AGENTS.md]
 
 - macOS (Intel/Apple Silicon) via **Homebrew**
 - Linux via **apt**, **dnf**, **pacman**, or **zypper**
+  - **Note:** Linux package managers require `sudo` access (or running as root) to install tools. If `sudo` is not available or fails, the installer will skip tool installations gracefully with a warning message.
 - Windows users: use **WSL** (Ubuntu) and run the Linux path
 
 ### Common flags
