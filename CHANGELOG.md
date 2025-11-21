@@ -6,6 +6,13 @@ All notable changes to this project will be documented in this file.
 
 _No changes yet._
 
+## [0.2.5] - 2025-11-21
+
+### Changed
+- Enhanced AGENTS.md installation prompts with clear explanations of what it does and why it's useful
+- Improved prompt messaging to clarify that AGENTS.md is optional and can be removed anytime
+- Better option labels that explain what each choice does (append vs overwrite vs skip)
+
 ## [0.2.4] - 2025-11-21
 
 ### Changed
