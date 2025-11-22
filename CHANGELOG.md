@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 _No changes yet._
 
-## [0.2.8] - 2025-01-XX
+## [0.2.8] - 2025-11-22
 
 ### Fixed
 - Handled misconfigured pnpm so Codex CLI upgrades still run:
