@@ -11,6 +11,9 @@ This project ships via the Node script at `scripts/release.ts`. The script bumps
 
 ## Prepare
 - Update `CHANGELOG.md` with a new section (e.g., `## [0.1.4] - YYYY-MM-DD`).
+  - **Important**: The section header must match the exact version format: `## [X.Y.Z] - YYYY-MM-DD`
+  - Include detailed descriptions of changes (Added/Changed/Fixed sections) so users can easily see what's included in the release
+  - The release script extracts this section automatically for the GitHub Release description
 - Ensure any user-facing docs (README, templates) are committed.
 
 ## Quick Release
@@ -33,11 +36,15 @@ This project ships via the Node script at `scripts/release.ts`. The script bumps
   - npm page renders README banner
   - `templates/` and `sounds/` are present in the tarball
   - Git tag `vX.Y.Z` exists and GitHub Release has notes
+  - **GitHub Release description**: Visit the release page and confirm the changelog content is displayed (not just "Full Changelog" link). If missing, check that the CHANGELOG.md section header matches `## [X.Y.Z]` exactly.
 
 ## Release Notes Tips
 - The script extracts notes from `CHANGELOG.md` for the current version.
+- **Changelog Format**: The section header must exactly match `## [X.Y.Z]` where `X.Y.Z` is the version being released (e.g., `## [0.2.8] - 2025-11-22`).
+- The extracted changelog section becomes the GitHub Release description, so include clear, user-friendly descriptions of changes.
 - If that section is missing, it falls back to the section named by `GH_NOTES_REF` (default: `0.4`).
   - Example: `GH_NOTES_REF=0.1.3 pnpm dlx tsx scripts/release.ts patch`
+- **Verification**: After release, check the GitHub Release page to confirm the changelog description appears correctly. If it's missing, the regex may not have matched—verify the CHANGELOG.md format matches `## [X.Y.Z]` exactly.
 
 ## Prereleases / Dist-Tags
 - To ship a prerelease manually, run the script to tag/commit, then publish with a tag:
