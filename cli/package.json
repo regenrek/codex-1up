@@ -2,7 +2,7 @@
   "name": "codex-1up",
   "private": false,
   "type": "module",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "description": "TypeScript CLI for codex-1up (citty-based)",
   "bin": {
     "codex-1up": "bin/codex-1up.mjs"
