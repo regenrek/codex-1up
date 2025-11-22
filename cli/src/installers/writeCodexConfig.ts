@@ -40,8 +40,6 @@ const PROFILE_DEFAULTS: Record<Profile, ProfileDefaults> = {
       ['sandbox_mode', '"danger-full-access"'],
       ['model', '"gpt-5.1-codex"'],
       ['model_reasoning_effort', '"medium"'],
-      ['model_reasoning_summary', '"detailed"'],
-      ['model_verbosity', '"high"'],
       ['tool_output_token_limit', '25000']
     ],
     features: [['web_search_request', 'true']]
