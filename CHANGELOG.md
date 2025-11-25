@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+_No changes yet._
+
+## [0.3.1] - 2025-11-25
+
 ### Fixed
 - Fixed spinner blocking sudo password prompts and TTY input on Linux (#14)
   - Removed continuous spinner during installation that was overwriting terminal output
