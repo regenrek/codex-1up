@@ -38,13 +38,23 @@ beforeAll(async () => {
 afterAll(async () => { try { await fs.rm(td, { recursive: true, force: true }) } catch {} })
 
 describe('custom sound absolute path', () => {
-  it('writes rc and patches notify.sh default to custom file', async () => {
+  it('patches notify.sh default to custom file', async () => {
     const ctx = makeCtx(CUSTOM_WAV)
     await ensureNotifyHook(ctx)
     await setupNotificationSound(ctx)
-    const rc = await fs.readFile(resolve(td, '.bashrc'), 'utf8').catch(()=>'')
-    expect(rc).toMatch(new RegExp(CUSTOM_WAV.replace(/[-/\\^$*+?.()|[\]{}]/g,'\\$&')))
     const notifyTxt = await fs.readFile(NOTIFY, 'utf8')
-    expect(notifyTxt).toMatch(new RegExp(`^DEFAULT_CODEX_SOUND=\"${CUSTOM_WAV.replace(/[-/\\^$*+?.()|[\]{}]/g,'\\$&')}\"`, 'm'))
+    // Use toContain for cross-platform compatibility (Windows uses backslashes)
+    expect(notifyTxt).toContain(`DEFAULT_CODEX_SOUND="${CUSTOM_WAV}`)
+  })
+
+  it('does not write any blocks to rc files (sound config lives in notify.sh only)', async () => {
+    const ctx = makeCtx(CUSTOM_WAV)
+    await ensureNotifyHook(ctx)
+    await setupNotificationSound(ctx)
+    // .bashrc should not exist or should not contain codex-1up markers
+    const rc = await fs.readFile(resolve(td, '.bashrc'), 'utf8').catch(()=>'')
+    expect(rc).not.toContain('>>> codex-1up >>>')
+    expect(rc).not.toContain('<<< codex-1up <<<')
+    expect(rc).not.toContain('CODEX_CUSTOM_SOUND')
   })
 })

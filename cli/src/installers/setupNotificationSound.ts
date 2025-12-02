@@ -7,13 +7,12 @@ export async function setupNotificationSound(ctx: InstallerContext): Promise<voi
   const targetDir = path.join(ctx.homeDir, '.codex', 'sounds')
   await fs.ensureDir(targetDir)
 
+  // Clean up any legacy rc blocks from older versions (they caused shell syntax errors)
+  await cleanupLegacyRcBlocks(ctx)
+
   const selected = ctx.options.notificationSound
   if (selected === 'none') {
-    const rcFile = await detectRcFile(ctx)
-    const block = `# Notification sound (disabled)\nexport CODEX_DISABLE_SOUND=1\nexport CODEX_CUSTOM_SOUND=""\n`
-    if (ctx.options.dryRun) ctx.logger.log(`[dry-run] update ${rcFile}`)
-    else await upsertRcBlock(rcFile, block, ctx)
-    // Also clear default in notify.sh for immediate effect
+    // Disable sound by clearing DEFAULT_CODEX_SOUND in notify.sh
     const notifyFile = path.join(ctx.homeDir, '.codex', 'notify.sh')
     if (await fs.pathExists(notifyFile)) {
       const txt = await fs.readFile(notifyFile, 'utf8')
@@ -43,13 +42,7 @@ export async function setupNotificationSound(ctx: InstallerContext): Promise<voi
     else await fs.copy(src, dest)
   }
 
-  const rcFile = await detectRcFile(ctx)
-  const block = `# Notification sound\nexport CODEX_DISABLE_SOUND=0\nexport CODEX_CUSTOM_SOUND="${dest}"\n`
-  if (ctx.options.dryRun) ctx.logger.log(`[dry-run] update ${rcFile}`)
-  else await upsertRcBlock(rcFile, block, ctx)
-  ctx.logger.ok('Notification sound configured. Open a new shell or source your rc to apply.')
-
-  // Also patch ~/.codex/notify.sh default path so preview works even before sourcing rc
+  // Patch ~/.codex/notify.sh with the selected sound path
   const notifyFile = path.join(ctx.homeDir, '.codex', 'notify.sh')
   if (await fs.pathExists(notifyFile)) {
     const txt = await fs.readFile(notifyFile, 'utf8')
@@ -60,42 +53,51 @@ export async function setupNotificationSound(ctx: InstallerContext): Promise<voi
       else await fs.writeFile(notifyFile, patched, 'utf8')
     }
   }
+  ctx.logger.ok('Notification sound configured')
 }
 
-async function detectRcFile(ctx: InstallerContext): Promise<string> {
-  const shell = ctx.options.shell || process.env.SHELL || ''
-  let target = 'auto'
-
-  if (target === 'auto') {
-    if (shell.includes('zsh')) target = 'zsh'
-    else if (shell.includes('fish')) target = 'fish'
-    else target = 'bash'
-  }
-
-  switch (target) {
-    case 'zsh':
-      return path.join(ctx.homeDir, '.zshrc')
-    case 'fish':
-      return path.join(ctx.homeDir, '.config', 'fish', 'config.fish')
-    default:
-      return path.join(ctx.homeDir, '.bashrc')
-  }
-}
-
-async function upsertRcBlock(rcFile: string, content: string, ctx: InstallerContext): Promise<void> {
+/**
+ * Remove legacy codex-1up blocks from shell rc files.
+ * Older versions wrote invalid `>>> codex-1up >>>` markers that caused shell syntax errors.
+ * This cleanup runs automatically so users don't need to manually fix their rc files.
+ */
+async function cleanupLegacyRcBlocks(ctx: InstallerContext): Promise<void> {
   const PROJECT = 'codex-1up'
-  await fs.ensureDir(path.dirname(rcFile))
+  const rcFiles = [
+    path.join(ctx.homeDir, '.bashrc'),
+    path.join(ctx.homeDir, '.zshrc'),
+    path.join(ctx.homeDir, '.config', 'fish', 'config.fish')
+  ]
 
-  let existing = ''
-  if (await fs.pathExists(rcFile)) {
-    existing = await fs.readFile(rcFile, 'utf8')
-    // Remove existing block
-    const startMarker = `>>> ${PROJECT} >>>`
-    const endMarker = `<<< ${PROJECT} <<<`
-    const regex = new RegExp(`${startMarker}[\\s\\S]*?${endMarker}\\n?`, 'g')
-    existing = existing.replace(regex, '')
+  for (const rcFile of rcFiles) {
+    if (!(await fs.pathExists(rcFile))) continue
+
+    const original = await fs.readFile(rcFile, 'utf8')
+    let cleaned = original
+
+    // Remove commented markers (newer format, but no longer needed)
+    const commentedStart = `# >>> ${PROJECT} >>>`
+    const commentedEnd = `# <<< ${PROJECT} <<<`
+    const commentedRegex = new RegExp(`${escapeRegex(commentedStart)}[\\s\\S]*?${escapeRegex(commentedEnd)}\\n?`, 'g')
+    cleaned = cleaned.replace(commentedRegex, '')
+
+    // Remove legacy bare markers (invalid shell syntax)
+    const legacyStart = `>>> ${PROJECT} >>>`
+    const legacyEnd = `<<< ${PROJECT} <<<`
+    const legacyRegex = new RegExp(`${escapeRegex(legacyStart)}[\\s\\S]*?${escapeRegex(legacyEnd)}\\n?`, 'g')
+    cleaned = cleaned.replace(legacyRegex, '')
+
+    if (cleaned !== original) {
+      if (ctx.options.dryRun) {
+        ctx.logger.log(`[dry-run] cleanup legacy codex-1up block from ${rcFile}`)
+      } else {
+        await fs.writeFile(rcFile, cleaned, 'utf8')
+        ctx.logger.ok(`Cleaned up legacy codex-1up block from ${rcFile}`)
+      }
+    }
   }
+}
 
-  const block = `>>> ${PROJECT} >>>\n${content}<<< ${PROJECT} <<<\n`
-  await fs.writeFile(rcFile, existing + block, 'utf8')
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 payload="${1:-$(cat)}"
 
-# Default bundled sound path placeholder; installer should set CODEX_CUSTOM_SOUND.
+# Default sound path, set by codex-1up installer. Override via CODEX_CUSTOM_SOUND env var if needed.
 DEFAULT_CODEX_SOUND="${HOME}/.codex/sounds/default.wav"
 
 # Respect opt-out via env var

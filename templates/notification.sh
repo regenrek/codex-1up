@@ -6,7 +6,7 @@ set -euo pipefail
 
 payload="${1:-$(cat)}"
 
-# Default bundled sound path; can be overridden via CODEX_CUSTOM_SOUND in your shell rc.
+# Default sound path, set by codex-1up installer. Override via CODEX_CUSTOM_SOUND env var if needed.
 DEFAULT_CODEX_SOUND="${HOME}/.codex/sounds/default.wav"
 
 # Respect opt-out via env var

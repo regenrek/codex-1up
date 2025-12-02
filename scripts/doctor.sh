@@ -39,7 +39,13 @@ fi
 echo "--- shell rc hints ---"
 echo "SHELL=$SHELL"
 for rc in "$HOME/.zshrc" "$HOME/.bashrc" "$HOME/.config/fish/config.fish"; do
-  [ -f "$rc" ] && grep -q ">>> codex-1up >>>" "$rc" && echo "Found codex-1up block in $rc"
+  if [ -f "$rc" ]; then
+    if grep -q "# >>> codex-1up >>>" "$rc"; then
+      echo "Found codex-1up block in $rc"
+    elif grep -q ">>> codex-1up >>>" "$rc"; then
+      echo "Found codex-1up block in $rc (legacy format - re-run installer to fix)"
+    fi
+  fi
 done
 
 echo "Done."

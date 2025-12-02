@@ -7,9 +7,10 @@ echo "Uninstall: removing shell alias blocks and git config entries"
 remove_block() {
   local rc="$1"
   [ -f "$rc" ] || return 0
+  # Remove both commented markers (new format) and legacy bare markers (old invalid format)
   if grep -q ">>> ${PROJECT} >>>" "$rc"; then
     # shellcheck disable=SC2016
-    sed -i.bak -e "/>>> ${PROJECT} >>>/,/<<< ${PROJECT} <</d" "$rc"
+    sed -i.bak -e "/# >>> ${PROJECT} >>>/,/# <<< ${PROJECT} <</d" -e "/>>> ${PROJECT} >>>/,/<<< ${PROJECT} <</d" "$rc"
     echo "Cleaned ${rc} (backup at ${rc}.bak)"
   fi
 }

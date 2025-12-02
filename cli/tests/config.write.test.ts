@@ -9,12 +9,15 @@ const td = join(tmpdir(), `codex-1up-test-${Date.now()}`)
 const CH = resolve(td, '.codex')
 const CFG = resolve(CH, 'config.toml')
 
-beforeAll(async () => { await fs.mkdir(CH, { recursive: true }) })
+beforeAll(async () => {
+  process.env.HOME = td
+  process.env.USERPROFILE = td // Windows compatibility
+  await fs.mkdir(CH, { recursive: true })
+})
 afterAll(async () => { try { await fs.rm(td, { recursive: true, force: true }) } catch {} })
 
 describe('config init/write', () => {
   it('writes unified config with profiles and features.web_search_request', async () => {
-    process.env.HOME = td
     await runCommand(root, { rawArgs: ['config', 'init', '--force'] })
     const data = await fs.readFile(CFG, 'utf8')
     expect(data).toMatch(/\[profiles\./)
@@ -22,7 +25,6 @@ describe('config init/write', () => {
   })
 
   it('enables reasoning steps in TUI by default', async () => {
-    process.env.HOME = td
     await runCommand(root, { rawArgs: ['config', 'init', '--force'] })
     const data = await fs.readFile(CFG, 'utf8')
     expect(data).toMatch(/\[tui\][\s\S]*show_raw_agent_reasoning\s*=\s*true/)

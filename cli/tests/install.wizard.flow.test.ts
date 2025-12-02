@@ -8,6 +8,7 @@ import { buildRawArgsFromFlags } from './test-utils'
 
 const td = join(tmpdir(), `codex-1up-test-${Date.now()}-wizard`)
 const CH = resolve(td, '.codex')
+const isWindows = process.platform === 'win32'
 
 // Mock clack prompts with deterministic answers based on message
 vi.mock('@clack/prompts', () => {
@@ -43,6 +44,7 @@ vi.mock('../src/installers/main.js', () => ({
 
 beforeAll(async () => {
   process.env.HOME = td
+  process.env.USERPROFILE = td // Windows compatibility
   await fs.mkdir(CH, { recursive: true })
   // Seed existing config to trigger overwrite question
   await fs.writeFile(resolve(CH, 'config.toml'), 'model = "gpt-5"\n', 'utf8')
@@ -63,7 +65,8 @@ describe('install wizard main flow', () => {
     expect(opts.profileMode).toBe('overwrite')
     expect(opts.setDefaultProfile).toBe(true)
     expect(opts.installCodexCli).toBe('yes')
-    expect(opts.installTools).toBe('yes')
+    // Tools default to 'yes' on Unix, 'no' on Windows (no package manager support)
+    expect(opts.installTools).toBe(isWindows ? 'no' : 'yes')
     expect(opts.notify).toBe('yes')
     expect(typeof opts.notificationSound).toBe('string')
     expect(opts.globalAgents).toBe('append-default')
@@ -91,7 +94,8 @@ describe('install wizard main flow', () => {
     expect(opts.profileScope).toBe('all')
     expect(opts.profileMode).toBe('add')
     expect(opts.installCodexCli).toBe('yes')
-    expect(opts.installTools).toBe('yes')
+    // Tools default to 'yes' on Unix, 'no' on Windows (no package manager support)
+    expect(opts.installTools).toBe(isWindows ? 'no' : 'yes')
     expect(opts.notify).toBe('no')
     expect(opts.notificationSound).toBeUndefined()
     prompts.select = origSelect
