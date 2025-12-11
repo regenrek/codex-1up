@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+- Default Codex model is now `gpt-5.2` in the unified config template and installer-written profiles.
+- Stop hardcoding `model_auto_compact_token_limit` by default (leave it optional) to avoid forcing premature compaction as Codex defaults evolve.
+- Stop hardcoding `tool_output_token_limit` by default; let Codex use its model-appropriate default unless you explicitly need huge tool outputs in-context.
+
 ## [0.3.3] - 2025-12-07
 
 ### Changed

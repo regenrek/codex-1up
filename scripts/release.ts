@@ -163,7 +163,7 @@ async function publishPackages(
 				if (repoSlug) {
 					readme = readme.replace(
 						/\]\(\.\/public\//g,
-						`] (https://raw.githubusercontent.com/${repoSlug}/main/public/`.replace(" ] ", "]"),
+						`](https://raw.githubusercontent.com/${repoSlug}/main/public/`,
 					);
 				}
 				fs.writeFileSync(path.join(pkgPath, "README.md"), readme);

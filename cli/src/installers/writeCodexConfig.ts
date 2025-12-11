@@ -6,6 +6,7 @@ import { createBackupPath } from './utils.js'
 interface ProfileDefaults {
   root: Array<[string, string]>
   features: Array<[string, string]>
+  tables?: Record<string, Array<[string, string]>>
 }
 
 const PROFILE_DEFAULTS: Record<Profile, ProfileDefaults> = {
@@ -17,7 +18,11 @@ const PROFILE_DEFAULTS: Record<Profile, ProfileDefaults> = {
       ['model_reasoning_effort', '"medium"'],
       ['model_reasoning_summary', '"concise"']
     ],
-    features: [['web_search_request', 'true']]
+    features: [['web_search_request', 'true']],
+    tables: {
+      // Required for web search (and other networked commands) in workspace-write sandbox.
+      sandbox_workspace_write: [['network_access', 'true']]
+    }
   },
   safe: {
     root: [
@@ -35,9 +40,7 @@ const PROFILE_DEFAULTS: Record<Profile, ProfileDefaults> = {
       ['sandbox_mode', '"danger-full-access"'],
       ['model', '"gpt-5.2"'],
       ['model_reasoning_effort', '"high"'],
-      ['model_reasoning_summary', '"detailed"'],
-      ['tool_output_token_limit', '25000'],
-      ['model_auto_compact_token_limit', '233000']
+      ['model_reasoning_summary', '"detailed"']
     ],
     features: [['web_search_request', 'true']]
   }
@@ -96,6 +99,9 @@ function applyProfile(
     if (mode === 'overwrite') {
       changed = editor.replaceTable(`profiles.${name}`, defaults.root) || changed
       changed = editor.replaceTable(`profiles.${name}.features`, defaults.features) || changed
+      for (const [table, lines] of Object.entries(defaults.tables || {})) {
+        changed = editor.replaceTable(`profiles.${name}.${table}`, lines) || changed
+      }
     } else {
       editor.ensureTable(`profiles.${name}`)
       for (const [key, value] of defaults.root) {
@@ -104,6 +110,12 @@ function applyProfile(
       editor.ensureTable(`profiles.${name}.features`)
       for (const [key, value] of defaults.features) {
         changed = editor.setKey(`profiles.${name}.features`, key, value, { mode: 'if-missing' }) || changed
+      }
+      for (const [table, lines] of Object.entries(defaults.tables || {})) {
+        editor.ensureTable(`profiles.${name}.${table}`)
+        for (const [key, value] of lines) {
+          changed = editor.setKey(`profiles.${name}.${table}`, key, value, { mode: 'if-missing' }) || changed
+        }
       }
     }
   }

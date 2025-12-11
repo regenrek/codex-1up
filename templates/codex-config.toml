@@ -61,7 +61,5 @@ sandbox_mode = "danger-full-access"
 model = "gpt-5.2"
 model_reasoning_effort = "high"
 model_reasoning_summary = "detailed"
-tool_output_token_limit = 25000
-model_auto_compact_token_limit = 233000  # 273k - (25k tool_output + 15k buffer)
 [profiles.yolo.features]
 web_search_request = true
