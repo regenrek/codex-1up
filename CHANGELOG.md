@@ -12,7 +12,6 @@ All notable changes to this project will be documented in this file.
 - Stop hardcoding `tool_output_token_limit` by default; let Codex use its model-appropriate default unless you explicitly need huge tool outputs in-context.
 - Ensure `profiles.balanced.sandbox_workspace_write.network_access = true` is set by default so web search can work in workspace-write mode.
 - Fix the release script README rewrite so images render correctly on npm.
-- Allow publishing with npm 2FA by passing a one-time password via `NPM_OTP` in the release script.
 
 ## [0.3.3] - 2025-12-07
 
