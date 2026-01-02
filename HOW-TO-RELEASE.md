@@ -30,7 +30,7 @@ This project ships via the Node script at `scripts/release.ts`. The script bumps
 - Configure this once in npm:
   - Go to the package settings → **Access** → **Trusted Publishers**
   - Add GitHub Actions as a trusted publisher for this repo
-  - Workflow file: `.github/workflows/npm-release.yml`
+  - Workflow filename: `npm-release.yml` (just the filename, not the full path)
   - Environment: leave blank unless you use GitHub Environments
 - GitHub Actions will mint short-lived OIDC credentials at publish time; no stored tokens.
 - The workflow pins npm CLI `11.5.1` to satisfy Trusted Publishing requirements.
