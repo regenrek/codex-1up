@@ -3,7 +3,7 @@ import { runCommand } from 'citty'
 import { buildRawArgsFromFlags } from './test-utils'
 import { updateCommand } from '../src/commands/update'
 
-const runSelfUpdateMock = vi.fn(async () => 'up-to-date')
+const runSelfUpdateMock = vi.hoisted(() => vi.fn(async () => 'up-to-date'))
 
 vi.mock('../src/actions/selfUpdate.js', () => ({
   runSelfUpdate: runSelfUpdateMock

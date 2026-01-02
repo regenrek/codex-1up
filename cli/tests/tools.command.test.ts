@@ -2,14 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { runCommand } from 'citty'
 import { toolsCommand } from '../src/commands/tools'
 
-const installToolsMock = vi.fn(async () => {})
-const getToolStatusesMock = vi.fn(async () => [])
-const getAllToolIdsMock = vi.fn(() => ['rg', 'fd'])
-const listToolDefinitionsMock = vi.fn(() => ([
+const installToolsMock = vi.hoisted(() => vi.fn(async () => {}))
+const getToolStatusesMock = vi.hoisted(() => vi.fn(async () => []))
+const getAllToolIdsMock = vi.hoisted(() => vi.fn(() => ['rg', 'fd']))
+const listToolDefinitionsMock = vi.hoisted(() => vi.fn(() => ([
   { id: 'rg' },
   { id: 'fd' }
-]))
-const isToolIdMock = vi.fn((value: string) => value === 'rg' || value === 'fd')
+])))
+const isToolIdMock = vi.hoisted(() => vi.fn((value: string) => value === 'rg' || value === 'fd'))
 
 vi.mock('../src/actions/tools.js', () => ({
   installTools: installToolsMock,

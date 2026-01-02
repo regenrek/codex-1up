@@ -2,12 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { runCommand } from 'citty'
 import { skillsCommand } from '../src/commands/skills'
 
-const listBundledMock = vi.fn(async () => [
+const listBundledMock = vi.hoisted(() => vi.fn(async () => [
   { id: 'debug-lldb', name: 'debug-lldb', description: 'debug', srcDir: '/tmp' }
-])
-const listInstalledMock = vi.fn(async () => [])
-const installSkillsMock = vi.fn(async () => {})
-const removeSkillMock = vi.fn(async () => {})
+]))
+const listInstalledMock = vi.hoisted(() => vi.fn(async () => []))
+const installSkillsMock = vi.hoisted(() => vi.fn(async () => {}))
+const removeSkillMock = vi.hoisted(() => vi.fn(async () => {}))
 
 vi.mock('../src/actions/skills.js', () => ({
   listBundled: listBundledMock,
