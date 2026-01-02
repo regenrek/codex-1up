@@ -6,10 +6,11 @@
 **Codex 1UP** equips your Codex CLI coding agent with powerful tools.
 
 - ✅ Installs/updates **Codex CLI** (`@openai/codex`)
-- ✅ Adds fast shell power tools: `ast-grep`, `fd`, `ripgrep`, `rg`, `fzf`, `jq`, `yq`
+- ✅ Adds fast shell power tools: `rg`, `fd`, `fzf`, `jq`, `yq`, `ast-grep`, `bat`, `git`, `git-delta`, `gh`
 - ✅ **AGENTS.md** template with tool selection guide
 - ✅ Unified **Codex config** with multiple profiles: `balanced` / `safe` / `yolo`
 - ✅ 🔊 **Notification sounds** with customizable audio alerts for Codex events
+- ✅ Built‑in `codex-1up update`, `tools`, and `skills` commands for ongoing maintenance
 
 ![Screenshot of Codex 1UP terminal interface](./public/example.png)
 
@@ -23,6 +24,12 @@ npx -y codex-1up install
 ```bash
 # Or install globally (recommended for repeated use)
 npm install -g codex-1up
+codex-1up install
+```
+
+```bash
+# Or install via Homebrew (macOS/Linux)
+brew install regenrek/tap/codex-1up
 codex-1up install
 ```
 
@@ -43,9 +50,13 @@ codex-1up install
 | **ripgrep (rg)**          | Fast text search across code.                                                           |
 | **fzf**                   | Fuzzy‑finder to select among many matches.                                              |
 | **jq** / **yq**           | Reliable JSON/YAML processing on the command line.                                      |
-| **difftastic**            | Fast syntax‑aware diff tool for git.                                                   |
+| **bat**                   | Better `cat` with syntax highlighting.                                                 |
+| **git**                   | Version control CLI (required for many workflows).                                     |
+| **git-delta**             | Better `git diff` output formatting.                                                   |
+| **gh**                    | GitHub CLI for repo and PR workflows.                                                  |
 | **\~/.codex/config.toml** | Single template with multiple profiles. Active profile is chosen during install (default: `balanced`). See [Codex config reference](https://github.com/openai/codex/blob/main/docs/config.md). |
 | **AGENTS.md**             | Minimal per‑repo rubric; installer can also create global `~/.codex/AGENTS.md`.         |
+| **\~/.codex/skills**      | Optional bundled Agent Skills (portable folders with `SKILL.md` + scripts/references). |
 | **\~/.codex/notify.sh**   | Notification hook script with customizable sounds for Codex events (default: `noti_1.wav`). |
 
 
@@ -72,6 +83,37 @@ codex-1up agents --path ~/.codex
 
 See memory behavior with AGENTS.md in the official docs: [Memory with AGENTS.md](https://github.com/openai/codex/blob/main/docs/getting-started.md#memory-with-agentsmd).
 
+## Bundled Agent Skills (optional)
+
+codex-1up can install bundled skills into `~/.codex/skills`. During install you can choose **None**, pick specific skills, or install all. Skills are portable folders containing `SKILL.md` plus optional scripts and references.
+
+## CLI commands
+
+```bash
+# Primary install flow (interactive wizard by default)
+codex-1up install
+
+# Self-update codex-1up
+codex-1up update
+
+# Tool management
+codex-1up tools list
+codex-1up tools install rg,fd
+codex-1up tools install all
+codex-1up tools doctor
+
+# Bundled skills
+codex-1up skills list
+codex-1up skills install debug-lldb
+codex-1up skills install all
+codex-1up skills remove debug-lldb
+codex-1up skills refresh
+
+# Configuration helpers
+codex-1up config profiles
+codex-1up config set-profile balanced
+```
+
 ## Doctor & Uninstall
 
 ```bash
@@ -96,9 +138,10 @@ See memory behavior with AGENTS.md in the official docs: [Memory with AGENTS.md]
 - `--no-vscode`            : skip VS Code extension checks
 - `--install-node nvm|brew|skip` : how to install Node.js if missing (default: `nvm`)
 - `--codex-cli yes|no`     : install/upgrade Codex CLI (default: `yes` on macOS/Linux)
-- `--tools yes|no`        : install/upgrade tools: rg, fd, fzf, jq, yq, difftastic, ast-grep (default: `yes` on macOS/Linux)
+- `--tools all|skip|<comma-separated>` : install/update tools: rg, fd, fzf, jq, yq, ast-grep, bat, git, git-delta, gh (default: `all` on macOS/Linux)
 - `--profile balanced|safe|yolo|skip` : profile to write (default: `balanced`)
 - `--profile-mode add|overwrite` : profile merge strategy (default: `add`)
+- `--skills all|skip|<comma-separated>` : install bundled skills into `~/.codex/skills` (default: `skip`)
 
 ### Advanced / CI flags
 
@@ -118,7 +161,7 @@ cd codex-1up
 ./bin/codex-1up install
 
 # Or run the CLI package directly in dev
-cd cli && corepack enable && pnpm i && pnpm build
+corepack enable && pnpm i && pnpm build
 node ./bin/codex-1up.mjs install
 ```
 

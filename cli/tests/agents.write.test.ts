@@ -15,7 +15,6 @@ describe('agents write', () => {
     await runCommand(root, { rawArgs: ['agents', '--path', td, '--template', 'default'] })
     const p = resolve(td, 'AGENTS.md')
     const data = await fs.readFile(p, 'utf8')
-    expect(data).toMatch(/Repository Guidelines|AGENTS.md|Templates/i)
+    expect(data).toMatch(/File Operations|ast-grep|Selection/i)
   })
 })
-

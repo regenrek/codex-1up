@@ -6,7 +6,7 @@ check() { if need "$1"; then echo "✔ $1"; else echo "✖ $1 (missing)"; fi }
 
 echo "codex-1up doctor"
 echo "--- binaries ---"
-for c in node npm codex ast-grep fd fdfind rg fzf jq yq difft delta code; do
+for c in node npm codex ast-grep rg fd fdfind fzf jq yq bat batcat git delta gh code; do
   check "$c"
 done
 
@@ -20,7 +20,6 @@ fi
 
 echo "--- git ---"
 echo "diff.external = $(git config --global --get diff.external || echo "(none)")"
-echo "difftool.difftastic.cmd = $(git config --global --get difftool.difftastic.cmd || echo "(none)")"
 echo "core.pager = $(git config --global --get core.pager || echo "(none)")"
 
 echo "--- codex config ---"

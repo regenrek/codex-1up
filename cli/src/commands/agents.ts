@@ -1,19 +1,9 @@
 import { defineCommand } from 'citty'
 import { promises as fs } from 'fs'
-import { accessSync } from 'fs'
 import { resolve, dirname } from 'path'
-import { fileURLToPath } from 'url'
+import { findRepoRoot } from '../lib/repoRoot.js'
 
-const __dirname = dirname(fileURLToPath(import.meta.url))
-function findRoot() {
-  let cur = __dirname
-  for (let i = 0; i < 6; i++) {
-    try { accessSync(resolve(cur, 'templates', 'codex-config.toml')); return cur } catch {}
-    cur = resolve(cur, '..')
-  }
-  return resolve(__dirname, '..')
-}
-const repoRoot = findRoot()
+const repoRoot = findRepoRoot()
 
 async function pathExists(p: string) {
   try { await fs.access(p); return true } catch { return false }

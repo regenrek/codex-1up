@@ -1,23 +1,22 @@
-import { $ } from 'zx'
-import type { InstallerContext, PackageManager } from './types.js'
-import { needCmd, detectPackageManager, runCommand, chooseNodePmForGlobal, createPrivilegedPmCmd } from './utils.js'
+import type { InstallerContext, PackageManager, ToolId } from './types.js'
+import { detectPackageManager, runCommand, createPrivilegedPmCmd, needCmd } from './utils.js'
+import { listTools } from './tooling.js'
 import * as path from 'path'
 import fs from 'fs-extra'
-
-const PACKAGE_MAP: Record<PackageManager, string[]> = {
-  brew: ['fd', 'ripgrep', 'fzf', 'jq', 'yq', 'difftastic', 'ast-grep'],
-  apt: ['ripgrep', 'fzf', 'jq', 'yq', 'git-delta'],
-  dnf: ['ripgrep', 'fd-find', 'fzf', 'jq', 'yq', 'git-delta'],
-  pacman: ['ripgrep', 'fd', 'fzf', 'jq', 'yq', 'git-delta'],
-  zypper: ['ripgrep', 'fd', 'fzf', 'jq', 'yq', 'git-delta'],
-  none: []
-}
+import { which } from 'zx'
 
 export async function ensureTools(ctx: InstallerContext): Promise<void> {
-  if (ctx.options.installTools === 'no') {
+  if (ctx.options.installTools === 'skip') {
     ctx.logger.info('Skipping developer tool installs (user choice)')
     return
   }
+
+  const selectedIds = resolveSelectedTools(ctx.options.installTools, ctx.options.toolsSelected)
+  if (selectedIds.length === 0) {
+    ctx.logger.info('Skipping developer tool installs (no tools selected)')
+    return
+  }
+
   const pm = await detectPackageManager()
   ctx.logger.info(`Detected package manager: ${pm}`)
 
@@ -26,10 +25,10 @@ export async function ensureTools(ctx: InstallerContext): Promise<void> {
     return
   }
 
-  const packages = PACKAGE_MAP[pm] || []
+  const tools = listTools().filter((t) => selectedIds.includes(t.id))
+  const packages = uniquePackages(tools, pm)
 
   if (packages.length > 0) {
-    // Warn about sudo requirement for Linux package managers (not needed for brew)
     if (pm !== 'brew') {
       const isRoot = typeof process.getuid === 'function' && process.getuid() === 0
       if (!isRoot) {
@@ -57,9 +56,9 @@ export async function ensureTools(ctx: InstallerContext): Promise<void> {
               dryRun: ctx.options.dryRun,
               logger: ctx.logger
             })
-          } catch (error) {
+          } catch {
             ctx.logger.warn(
-              'apt-get update failed; install developer tools manually with "sudo apt-get update" followed by installs for ripgrep, fzf, jq, yq, git-delta, then re-run codex-1up if needed.'
+              `apt-get update failed; install tools manually: ${packages.join(', ')}`
             )
             break
           }
@@ -71,23 +70,7 @@ export async function ensureTools(ctx: InstallerContext): Promise<void> {
                 logger: ctx.logger
               })
             } catch {
-              ctx.logger.warn(
-                `apt-get install failed for ${pkg}; you can install it manually with "sudo apt-get install ${pkg}".`
-              )
-            }
-          }
-
-          // Try to install fd-find separately if fd not found
-          if (!(await needCmd('fd'))) {
-            try {
-              await runCommand(aptCmd, [...argsPrefix, 'install', '-y', 'fd-find'], {
-                dryRun: ctx.options.dryRun,
-                logger: ctx.logger
-              })
-            } catch {
-              ctx.logger.warn(
-                'apt-get install failed for fd-find; fd may not be available. Install manually if you prefer fd over fdfind.'
-              )
+              ctx.logger.warn(`apt-get install failed for ${pkg}; install manually if needed.`)
             }
           }
         }
@@ -126,113 +109,68 @@ export async function ensureTools(ctx: InstallerContext): Promise<void> {
     }
   }
 
-  // Try to install difftastic via cargo if not present
-  if (!(await needCmd('difft')) && !(await needCmd('difftastic'))) {
-    if (await needCmd('cargo')) {
-      ctx.logger.info('Installing difftastic via cargo')
-      await runCommand('cargo', ['install', 'difftastic'], {
-        dryRun: ctx.options.dryRun,
-        logger: ctx.logger
-      })
-    } else {
-      ctx.logger.warn('difftastic not found and Rust/cargo missing; falling back to git-delta')
-    }
+  if (selectedIds.includes('fd')) {
+    await ensureAlias(ctx, 'fdfind', 'fd')
+  }
+  if (selectedIds.includes('bat')) {
+    await ensureAlias(ctx, 'batcat', 'bat')
   }
 
-  await ensureAstGrep(ctx, pm)
+  await logToolSummary(ctx, tools)
+}
 
-  // Symlink fd on Debian/Ubuntu (fd-find)
-  if (await needCmd('fdfind') && !(await needCmd('fd'))) {
-    const localBin = path.join(ctx.homeDir, '.local', 'bin')
-    await fs.ensureDir(localBin)
-    const fdfindPath = (await $`command -v fdfind`).stdout.trim()
-    const fdLink = path.join(localBin, 'fd')
-    if (!(await fs.pathExists(fdLink))) {
-      if (ctx.options.dryRun) {
-        ctx.logger.log(`[dry-run] ln -s ${fdfindPath} ${fdLink}`)
-      } else {
-        await fs.symlink(fdfindPath, fdLink)
-      }
-      ctx.logger.ok('fd alias created at ~/.local/bin/fd')
-    }
-  }
+function resolveSelectedTools(mode: InstallerContext['options']['installTools'], selected: ToolId[] | undefined): ToolId[] {
+  if (mode === 'all') return listTools().map((t) => t.id)
+  if (mode === 'select') return selected ? [...selected] : []
+  return []
+}
 
-  // Show summary
-  const tools = ['fd', 'fdfind', 'rg', 'fzf', 'jq', 'yq', 'difft', 'difftastic', 'delta', 'ast-grep']
+function uniquePackages(tools: ReturnType<typeof listTools>, pm: PackageManager): string[] {
+  const packages: string[] = []
   for (const tool of tools) {
-    if (await needCmd(tool)) {
-      ctx.logger.ok(`${tool} ✓`)
+    const entries = tool.packages[pm] || []
+    for (const pkg of entries) {
+      if (!packages.includes(pkg)) packages.push(pkg)
+    }
+  }
+  return packages
+}
+
+async function ensureAlias(ctx: InstallerContext, sourceBin: string, targetBin: string): Promise<void> {
+  if (!(await needCmd(sourceBin))) return
+  if (await needCmd(targetBin)) return
+  const localBin = path.join(ctx.homeDir, '.local', 'bin')
+  await fs.ensureDir(localBin)
+  const linkPath = path.join(localBin, targetBin)
+  if (await fs.pathExists(linkPath)) return
+  let sourcePath = sourceBin
+  try {
+    sourcePath = await which(sourceBin)
+  } catch (error) {
+    void error
+  }
+  if (ctx.options.dryRun) {
+    ctx.logger.log(`[dry-run] ln -s ${sourcePath} ${linkPath}`)
+    return
+  }
+  await fs.symlink(sourcePath, linkPath)
+  ctx.logger.ok(`${targetBin} alias created at ~/.local/bin/${targetBin}`)
+}
+
+async function logToolSummary(ctx: InstallerContext, tools: ReturnType<typeof listTools>): Promise<void> {
+  for (const tool of tools) {
+    const installed = await isToolInstalled(tool)
+    if (installed) {
+      ctx.logger.ok(`${tool.id} ✓`)
+    } else {
+      ctx.logger.warn(`${tool.id} not detected after install`)
     }
   }
 }
 
-async function ensureAstGrep(ctx: InstallerContext, pm: PackageManager): Promise<void> {
-  if ((await needCmd('sg')) || (await needCmd('ast-grep'))) return
-
-  const installViaPm = async () => {
-    switch (pm) {
-      case 'brew':
-        await runCommand('brew', ['install', 'ast-grep'], { dryRun: ctx.options.dryRun, logger: ctx.logger })
-        return true
-      case 'apt':
-        {
-          const { cmd, argsPrefix } = createPrivilegedPmCmd('apt-get')
-          await runCommand(cmd, [...argsPrefix, 'install', '-y', 'ast-grep'], {
-            dryRun: ctx.options.dryRun,
-            logger: ctx.logger
-          }).catch(() => {})
-        }
-        return true
-      case 'dnf':
-        {
-          const { cmd, argsPrefix } = createPrivilegedPmCmd('dnf')
-          await runCommand(cmd, [...argsPrefix, 'install', '-y', 'ast-grep'], {
-            dryRun: ctx.options.dryRun,
-            logger: ctx.logger
-          }).catch(() => {})
-        }
-        return true
-      case 'pacman':
-        {
-          const { cmd, argsPrefix } = createPrivilegedPmCmd('pacman')
-          await runCommand(cmd, [...argsPrefix, '-Sy', '--noconfirm', 'ast-grep'], {
-            dryRun: ctx.options.dryRun,
-            logger: ctx.logger
-          }).catch(() => {})
-        }
-        return true
-      case 'zypper':
-        {
-          const { cmd, argsPrefix } = createPrivilegedPmCmd('zypper')
-          await runCommand(cmd, [...argsPrefix, 'install', '-y', 'ast-grep'], {
-            dryRun: ctx.options.dryRun,
-            logger: ctx.logger
-          }).catch(() => {})
-        }
-        return true
-      default:
-        return false
-    }
+async function isToolInstalled(tool: ReturnType<typeof listTools>[number]): Promise<boolean> {
+  for (const bin of tool.bins) {
+    if (await needCmd(bin)) return true
   }
-
-  const attemptedPm = await installViaPm()
-  if ((await needCmd('sg')) || (await needCmd('ast-grep'))) return
-
-  // Fallback: npm global install
-  const nodePmChoice = await chooseNodePmForGlobal(ctx.logger)
-  const nodePm =
-    nodePmChoice.pm === 'none' && nodePmChoice.reason?.startsWith('pnpm-') ? 'npm' : nodePmChoice.pm
-
-  if (nodePm === 'pnpm') {
-    ctx.logger.info('Installing ast-grep via pnpm -g')
-    await runCommand('pnpm', ['add', '-g', '@ast-grep/cli'], { dryRun: ctx.options.dryRun, logger: ctx.logger })
-  } else if (nodePm === 'npm') {
-    if (nodePmChoice.pm === 'none') {
-      ctx.logger.warn('pnpm is misconfigured; falling back to npm for ast-grep install.')
-    }
-    ctx.logger.info('Installing ast-grep via npm -g')
-    await runCommand('npm', ['install', '-g', '@ast-grep/cli'], { dryRun: ctx.options.dryRun, logger: ctx.logger })
-  } else if (!attemptedPm) {
-    ctx.logger.warn('ast-grep not installed (no supported package manager or global npm). Install manually from https://ast-grep.github.io/')
-  }
+  return false
 }

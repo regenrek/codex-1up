@@ -1,29 +1,28 @@
 import { defineCommand } from 'citty'
-import { readFileSync } from 'fs'
-import { fileURLToPath } from 'url'
-import { dirname, join } from 'path'
 import { installCommand } from './commands/install.js'
 import { agentsCommand } from './commands/agents.js'
 import { doctorCommand } from './commands/doctor.js'
 import { uninstallCommand } from './commands/uninstall.js'
 import { configCommand } from './commands/config.js'
-
-const __dirname = dirname(fileURLToPath(import.meta.url))
-const packageJson = JSON.parse(
-  readFileSync(join(__dirname, '../package.json'), 'utf-8')
-)
+import { PACKAGE_DESCRIPTION, PACKAGE_VERSION } from './lib/package.js'
+import { updateCommand } from './commands/update.js'
+import { toolsCommand } from './commands/tools.js'
+import { skillsCommand } from './commands/skills.js'
 
 export const root = defineCommand({
   meta: {
     name: 'codex-1up',
-    version: packageJson.version,
-    description: 'Power up Codex CLI with clean profiles config and helpers'
+    version: PACKAGE_VERSION,
+    description: PACKAGE_DESCRIPTION
   },
   subCommands: {
     install: installCommand,
     agents: agentsCommand,
     doctor: doctorCommand,
     uninstall: uninstallCommand,
-    config: configCommand
+    config: configCommand,
+    update: updateCommand,
+    tools: toolsCommand,
+    skills: skillsCommand
   }
 })

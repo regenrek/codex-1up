@@ -19,6 +19,7 @@ vi.mock('@clack/prompts', () => {
     select: vi.fn(async ({ message, options }: any) => {
       const msg = String(message)
       if (msg.includes('Install all profiles')) return 'all'
+      if (msg.includes('Select a default profile')) return 'safe'
       if (msg.includes('Choose a Codex profile')) return 'safe'
       if (msg.startsWith('How should we write all profiles')) return 'overwrite'
       if (msg === 'Notification sound') return 'noti_1.wav'
@@ -26,6 +27,11 @@ vi.mock('@clack/prompts', () => {
       if (msg.includes('Global ~/.codex/AGENTS.md')) return 'append-default'
       // Fallback to first option value
       return (options && options[0] && options[0].value) || null
+    }),
+    multiselect: vi.fn(async ({ message }: any) => {
+      const msg = String(message)
+      if (msg.includes('Select profiles to install')) return ['balanced', 'safe']
+      return ['debug-lldb']
     }),
     text: vi.fn(async () => 'yes'),
     spinner: vi.fn(() => ({ start: vi.fn(), stop: vi.fn() })),
@@ -35,6 +41,19 @@ vi.mock('@clack/prompts', () => {
     cancel: vi.fn()
   }
 })
+
+vi.mock('../src/installers/codexStatus.js', () => ({
+  getCodexStatus: vi.fn(async () => ({
+    found: true,
+    version: '0.61.0',
+    latest: '0.63.0',
+    updateAvailable: true
+  }))
+}))
+
+vi.mock('../src/actions/selfUpdate.js', () => ({
+  runSelfUpdate: vi.fn(async () => 'up-to-date')
+}))
 
 // Capture installer options
 const captured: any[] = []
@@ -65,8 +84,8 @@ describe('install wizard main flow', () => {
     expect(opts.profileMode).toBe('overwrite')
     expect(opts.setDefaultProfile).toBe(true)
     expect(opts.installCodexCli).toBe('yes')
-    // Tools default to 'yes' on Unix, 'no' on Windows (no package manager support)
-    expect(opts.installTools).toBe(isWindows ? 'no' : 'yes')
+    // Tools default to 'all' on Unix, 'skip' on Windows (no package manager support)
+    expect(opts.installTools).toBe(isWindows ? 'skip' : 'all')
     expect(opts.notify).toBe('yes')
     expect(typeof opts.notificationSound).toBe('string')
     expect(opts.globalAgents).toBe('append-default')
@@ -81,6 +100,7 @@ describe('install wizard main flow', () => {
     prompts.select = vi.fn(async ({ message, options }: any) => {
       const msg = String(message)
       if (msg.includes('Install all profiles')) return 'all'
+      if (msg.includes('Select a default profile')) return 'balanced'
       if (msg.includes('Choose a Codex profile')) return 'balanced'
       if (msg.startsWith('How should we write all profiles')) return 'add'
       if (msg === 'Notification sound') return 'skip'
@@ -94,10 +114,62 @@ describe('install wizard main flow', () => {
     expect(opts.profileScope).toBe('all')
     expect(opts.profileMode).toBe('add')
     expect(opts.installCodexCli).toBe('yes')
-    // Tools default to 'yes' on Unix, 'no' on Windows (no package manager support)
-    expect(opts.installTools).toBe(isWindows ? 'no' : 'yes')
+    // Tools default to 'all' on Unix, 'skip' on Windows (no package manager support)
+    expect(opts.installTools).toBe(isWindows ? 'skip' : 'all')
     expect(opts.notify).toBe('no')
     expect(opts.notificationSound).toBeUndefined()
     prompts.select = origSelect
+  })
+
+  it('allows selecting skills in the wizard', async () => {
+    captured.length = 0
+    const prompts = await import('@clack/prompts') as any
+    const origSelect = prompts.select
+    prompts.select = vi.fn(async ({ message, options }: any) => {
+      const msg = String(message)
+      if (msg.includes('Install all profiles')) return 'all'
+      if (msg.includes('Select a default profile')) return 'balanced'
+      if (msg.includes('Choose a Codex profile')) return 'balanced'
+      if (msg.startsWith('How should we write all profiles')) return 'add'
+      if (msg === 'Notification sound') return 'noti_1.wav'
+      if (msg.startsWith('Selected:')) return 'use'
+      if (msg.includes('Global ~/.codex/AGENTS.md')) return 'skip'
+      if (msg.includes('Install bundled Agent Skills')) return 'select'
+      return (options && options[0] && options[0].value) || null
+    })
+    await runCommand(installCommand, { rawArgs: buildRawArgsFromFlags({}) })
+    const opts = captured.pop()
+    expect(opts.skills).toBe('select')
+    expect(opts.skillsSelected).toEqual(['debug-lldb'])
+    prompts.select = origSelect
+  })
+
+  it('allows selecting specific profiles in the wizard', async () => {
+    captured.length = 0
+    const prompts = await import('@clack/prompts') as any
+    const origSelect = prompts.select
+    const origMultiselect = prompts.multiselect
+    prompts.select = vi.fn(async ({ message, options }: any) => {
+      const msg = String(message)
+      if (msg.includes('Install all profiles')) return 'selected'
+      if (msg.startsWith('How should we write selected profiles')) return 'add'
+      if (msg.includes('Select a default profile')) return 'skip'
+      if (msg === 'Notification sound') return 'noti_1.wav'
+      if (msg.startsWith('Selected:')) return 'use'
+      if (msg.includes('Global ~/.codex/AGENTS.md')) return 'skip'
+      return (options && options[0] && options[0].value) || null
+    })
+    prompts.multiselect = vi.fn(async ({ message }: any) => {
+      const msg = String(message)
+      if (msg.includes('Select profiles to install')) return ['balanced', 'safe']
+      return ['debug-lldb']
+    })
+    await runCommand(installCommand, { rawArgs: buildRawArgsFromFlags({}) })
+    const opts = captured.pop()
+    expect(opts.profileScope).toBe('selected')
+    expect(opts.profilesSelected).toEqual(['balanced', 'safe'])
+    expect(opts.setDefaultProfile).toBe(false)
+    prompts.select = origSelect
+    prompts.multiselect = origMultiselect
   })
 })

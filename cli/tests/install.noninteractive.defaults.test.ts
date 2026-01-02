@@ -36,9 +36,9 @@ describe('install non-interactive defaults', () => {
     expect(opts.profileScope).toBe('single')
     expect(opts.profileMode).toBe('add')
     expect(opts.setDefaultProfile).toBe(true)
-    expect(opts.installCodexCli).toBe('yes')
-    // Tools default to 'yes' on Unix, 'no' on Windows (no package manager support)
-    expect(opts.installTools).toBe(isWindows ? 'no' : 'yes')
+    expect(opts.installCodexCli).toBe('auto')
+    // Tools default to 'all' on Unix, 'skip' on Windows (no package manager support)
+    expect(opts.installTools).toBe(isWindows ? 'skip' : 'all')
     expect(opts.mode).toBe('manual')
     // Global agents skipped by default
     expect(opts.globalAgents).toBe('skip')

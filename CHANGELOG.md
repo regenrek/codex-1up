@@ -4,7 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- New `codex-1up update` command to self-update the CLI.
+- New `codex-1up tools` and `codex-1up skills` commands for managing tool installs and bundled Agent Skills.
+
 ### Changed
+- Installer refactor: CLI commands call shared actions, and the interactive wizard now lives in its own flow module.
 - Default Codex model is now `gpt-5.2-codex` in the unified config template and installer-written profiles.
 - Migrate deprecated `enable_experimental_windows_sandbox` to `[features].experimental_windows_sandbox` when patching `~/.codex/config.toml`.
 - Migrate deprecated root-level feature booleans (e.g. `experimental_use_unified_exec_tool`) into `[features]` when patching `~/.codex/config.toml`.

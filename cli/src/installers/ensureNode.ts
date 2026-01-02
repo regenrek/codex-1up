@@ -1,6 +1,5 @@
 import { $ } from 'zx'
-import { which } from 'zx'
-import type { InstallerContext, InstallNodeMethod } from './types.js'
+import type { InstallerContext } from './types.js'
 import { needCmd, runCommand } from './utils.js'
 import fs from 'fs-extra'
 import * as path from 'path'
@@ -49,8 +48,6 @@ async function installNodeViaNvm(ctx: InstallerContext): Promise<void> {
   }
 
   const nvmDir = path.join(ctx.homeDir, '.nvm')
-  const nvmSh = path.join(nvmDir, 'nvm.sh')
-
   if (!(await fs.pathExists(nvmDir))) {
     ctx.logger.info('Installing nvm...')
     await $`bash -c "curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash"`
@@ -89,8 +86,8 @@ async function installNodeViaBrew(ctx: InstallerContext): Promise<void> {
           if (pathMatch) {
             process.env.PATH = `${pathMatch[1]}:${process.env.PATH || ''}`
           }
-        } catch {
-          // Ignore errors
+        } catch (error) {
+          void error
         }
       }
     } else {

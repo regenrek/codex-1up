@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { InstallerContext } from '../src/installers/types.js'
 import { installNpmGlobals } from '../src/installers/installNpmGlobals.js'
-import { runCommand, chooseNodePmForGlobal, needCmd } from '../src/installers/utils.js'
+import { runCommand, needCmd } from '../src/installers/utils.js'
+import { resolveNodeGlobalPm } from '../src/installers/nodeGlobal.js'
 import * as prompts from '@clack/prompts'
 
 // Mock zx calls used inside installNpmGlobals
@@ -30,10 +31,13 @@ vi.mock('../src/installers/utils.js', async () => {
   return {
     ...actual,
     runCommand: vi.fn(async () => {}),
-    needCmd: vi.fn(async () => true),
-    chooseNodePmForGlobal: vi.fn(async () => ({ pm: 'none', reason: 'pnpm-misconfigured' as const }))
+    needCmd: vi.fn(async () => true)
   }
 })
+
+vi.mock('../src/installers/nodeGlobal.js', () => ({
+  resolveNodeGlobalPm: vi.fn(async () => 'npm')
+}))
 
 // Mock prompts to drive interactive choices
 vi.mock('@clack/prompts', () => ({
@@ -63,11 +67,14 @@ function createCtx(overrides: Partial<InstallerContext['options']> = {}): Instal
       profileScope: 'single',
       profileMode: 'add',
       setDefaultProfile: true,
-      installTools: 'yes',
+      installTools: 'all',
+      toolsSelected: undefined,
       installCodexCli: 'yes',
       notify: undefined,
       globalAgents: undefined,
       notificationSound: undefined,
+      skills: 'skip',
+      skillsSelected: undefined,
       mode: 'manual',
       installNode: 'skip',
       shell: 'zsh',
@@ -87,13 +94,32 @@ describe('installNpmGlobals pnpm fallback', () => {
     vi.clearAllMocks()
   })
 
+  it('prompts to update when Codex is installed and newer version is available', async () => {
+    const ctx = createCtx({ installCodexCli: 'auto' as const })
+    Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true })
+    await installNpmGlobals(ctx)
+
+    expect(prompts.confirm).toHaveBeenCalled()
+    expect(runCommand).toHaveBeenCalledWith('npm', ['install', '-g', '@openai/codex@0.63.0'], expect.any(Object))
+  })
+
+  it('prompts to install when Codex is not found', async () => {
+    const ctx = createCtx({ installCodexCli: 'auto' as const })
+    Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true })
+    const needCmdMock = vi.mocked(needCmd)
+    needCmdMock.mockResolvedValueOnce(false).mockResolvedValueOnce(true)
+    await installNpmGlobals(ctx)
+
+    expect(prompts.confirm).toHaveBeenCalled()
+    expect(runCommand).toHaveBeenCalledWith('npm', ['install', '-g', '@openai/codex@0.63.0'], expect.any(Object))
+  })
+
   it('prompts and falls back to npm when pnpm is misconfigured', async () => {
     const ctx = createCtx()
     Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true })
     await installNpmGlobals(ctx)
 
-    expect(chooseNodePmForGlobal).toHaveBeenCalled()
-    expect(prompts.select).toHaveBeenCalled()
+    expect(resolveNodeGlobalPm).toHaveBeenCalled()
     expect(runCommand).toHaveBeenCalledWith('npm', ['install', '-g', '@openai/codex@0.63.0'], expect.any(Object))
   })
 

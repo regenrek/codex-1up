@@ -1,5 +1,3 @@
-# AGENTS.md — Tool Selection
-
 When you need to call tools from the shell, use this rubric:
 
 ## File Operations
@@ -23,3 +21,4 @@ When you need to call tools from the shell, use this rubric:
 
 ## Guidelines
 - Prefer deterministic, non-interactive commands (`head`, `--filter`, `--json` + `jq`) so runs are reproducible
+?

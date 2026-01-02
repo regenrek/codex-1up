@@ -6,6 +6,7 @@ export function createLogger(logFile: string): Logger {
   try {
     logStream = createWriteStream(logFile, { flags: 'a' })
   } catch (error) {
+    void error
     // Fallback to stdout only if file write fails
   }
 
@@ -25,4 +26,3 @@ export function createLogger(logFile: string): Logger {
     err: (msg: string) => write('✖', msg)
   }
 }
-

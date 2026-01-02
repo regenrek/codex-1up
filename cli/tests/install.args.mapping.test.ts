@@ -52,4 +52,63 @@ describe('install args mapping', () => {
     expect(opts.noVscode).toBe(true)
     // vscodeId may be present in args but should not be used when noVscode true; we only assert flag
   })
+
+  it('maps --skills=all', async () => {
+    Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true })
+    await runCommand(installCommand, { rawArgs: buildRawArgsFromFlags({
+      yes: true,
+      'skip-confirmation': true,
+      skills: 'all'
+    }) })
+    const opts = captured.pop()
+    expect(opts.skills).toBe('all')
+    expect(opts.skillsSelected).toBeUndefined()
+  })
+
+  it('maps --skills=none to skip', async () => {
+    Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true })
+    await runCommand(installCommand, { rawArgs: buildRawArgsFromFlags({
+      yes: true,
+      'skip-confirmation': true,
+      skills: 'none'
+    }) })
+    const opts = captured.pop()
+    expect(opts.skills).toBe('skip')
+    expect(opts.skillsSelected).toBeUndefined()
+  })
+
+  it('maps --skills=<name> to selection', async () => {
+    Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true })
+    await runCommand(installCommand, { rawArgs: buildRawArgsFromFlags({
+      yes: true,
+      'skip-confirmation': true,
+      skills: 'debug-lldb'
+    }) })
+    const opts = captured.pop()
+    expect(opts.skills).toBe('select')
+    expect(opts.skillsSelected).toEqual(['debug-lldb'])
+  })
+
+  it('rejects unknown --skills names', async () => {
+    Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true })
+    await expect(
+      runCommand(installCommand, { rawArgs: buildRawArgsFromFlags({
+        yes: true,
+        'skip-confirmation': true,
+        skills: 'does-not-exist'
+      }) })
+    ).rejects.toThrow(/Unknown skill/)
+  })
+
+  it('maps --tools list to selection', async () => {
+    Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true })
+    await runCommand(installCommand, { rawArgs: buildRawArgsFromFlags({
+      yes: true,
+      'skip-confirmation': true,
+      tools: 'rg,fd'
+    }) })
+    const opts = captured.pop()
+    expect(opts.installTools).toBe('select')
+    expect(opts.toolsSelected).toEqual(['rg', 'fd'])
+  })
 })

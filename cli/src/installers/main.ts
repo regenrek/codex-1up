@@ -12,6 +12,7 @@ import { setupNotificationSound } from './setupNotificationSound.js'
 import { maybePromptGlobalAgents } from './maybePromptGlobalAgents.js'
 import { maybeInstallVscodeExt } from './maybeInstallVscodeExt.js'
 import { maybeWriteAgents } from './maybeWriteAgents.js'
+import { maybeInstallSkills } from './maybeInstallSkills.js'
 import { needCmd } from './utils.js'
 
 const PROJECT = 'codex-1up'
@@ -57,6 +58,7 @@ export async function runInstaller(options: InstallerOptions, rootDir: string): 
       await maybePromptGlobalAgents(ctx)
     }
 
+    await maybeInstallSkills(ctx)
     await maybeInstallVscodeExt(ctx)
     await maybeWriteAgents(ctx)
 

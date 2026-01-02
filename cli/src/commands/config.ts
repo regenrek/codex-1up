@@ -1,20 +1,10 @@
 import { defineCommand } from 'citty'
 import { promises as fs } from 'fs'
 import { resolve, dirname } from 'path'
-import { fileURLToPath } from 'url'
-import { accessSync } from 'fs'
 import os from 'os'
+import { findRepoRoot } from '../lib/repoRoot.js'
 
-const __dirname = dirname(fileURLToPath(import.meta.url))
-function findRoot(){
-  let cur = __dirname
-  for (let i=0;i<6;i++){
-    try { accessSync(resolve(cur,'templates','codex-config.toml')); return cur } catch {}
-    cur = resolve(cur,'..')
-  }
-  return resolve(__dirname,'..')
-}
-const repoRoot = findRoot()
+const repoRoot = findRepoRoot()
 
 function getPaths() {
   const CODEX_HOME = resolve(os.homedir(), '.codex')

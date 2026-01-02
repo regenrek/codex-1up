@@ -1,7 +1,7 @@
-import type { InstallerContext, GlobalAgentsAction } from './types.js'
+import type { InstallerContext } from './types.js'
 import fs from 'fs-extra'
 import * as path from 'path'
-import { createBackupPath, runCommand } from './utils.js'
+import { createBackupPath } from './utils.js'
 
 export async function maybePromptGlobalAgents(ctx: InstallerContext): Promise<void> {
   const targetPath = path.join(ctx.homeDir, '.codex', 'AGENTS.md')
@@ -20,7 +20,7 @@ export async function maybePromptGlobalAgents(ctx: InstallerContext): Promise<vo
   }
 
   switch (gaMode) {
-    case 'create-default':
+    case 'create-default': {
       if (await fs.pathExists(targetPath)) {
         ctx.logger.info('Global AGENTS.md already exists; leaving unchanged')
         return
@@ -33,8 +33,9 @@ export async function maybePromptGlobalAgents(ctx: InstallerContext): Promise<vo
       }
       ctx.logger.ok(`Wrote ${targetPath}`)
       break
+    }
 
-    case 'overwrite-default':
+    case 'overwrite-default': {
       await fs.ensureDir(path.dirname(targetPath))
       if (await fs.pathExists(targetPath)) {
         const backup = createBackupPath(targetPath)
@@ -52,8 +53,9 @@ export async function maybePromptGlobalAgents(ctx: InstallerContext): Promise<vo
       }
       ctx.logger.ok(`Wrote ${targetPath}`)
       break
+    }
 
-    case 'append-default':
+    case 'append-default': {
       await fs.ensureDir(path.dirname(targetPath))
       if (await fs.pathExists(targetPath)) {
         const backup = createBackupPath(targetPath)
@@ -72,6 +74,7 @@ export async function maybePromptGlobalAgents(ctx: InstallerContext): Promise<vo
       }
       ctx.logger.ok(`Appended template to ${targetPath}`)
       break
+    }
 
     default:
       // Should be handled by CLI layer for interactive prompts

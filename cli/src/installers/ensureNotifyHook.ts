@@ -74,9 +74,6 @@ async function updateConfigForNotify(
   let currentTable = ''
   let rootNotifyIndex: number | null = null
   let rootTuiStart: number | null = null
-  let removedMisplacedNotify = false
-  let removedMisplacedTui = false
-
   // Scan to find existing root notify and [tui] table, and remove misplaced keys
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
@@ -96,17 +93,17 @@ async function updateConfigForNotify(
         if (rootNotifyIndex === null) rootNotifyIndex = i
       } else if (/^profiles\.[^.]+\.features$/.test(currentTable)) {
         // Remove misplaced notify inside features
-        lines.splice(i, 1); i--; removedMisplacedNotify = true
+        lines.splice(i, 1); i--
       }
     }
     if (isTuiNotifications) {
       if (/^profiles\.[^.]+\.features$/.test(currentTable)) {
-        lines.splice(i, 1); i--; removedMisplacedTui = true
+        lines.splice(i, 1); i--
       }
     }
     // Remove stray root-level notifications = ... (should live under [tui])
     if (isBareNotifications && currentTable === '') {
-      lines.splice(i, 1); i--; removedMisplacedTui = true
+      lines.splice(i, 1); i--
     }
   }
 

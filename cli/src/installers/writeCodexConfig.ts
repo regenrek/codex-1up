@@ -58,7 +58,13 @@ export async function writeCodexConfig(ctx: InstallerContext): Promise<void> {
   const editor = new TomlEditor(migratedLegacyFeatures.toml)
   let touched = migratedWindowsSandbox.changed || migratedLegacyFeatures.changed
 
-  touched = applyProfile(editor, ctx.options.profileScope, ctx.options.profile, ctx.options.profileMode) || touched
+  touched = applyProfile(
+    editor,
+    ctx.options.profileScope,
+    ctx.options.profile,
+    ctx.options.profileMode,
+    ctx.options.profilesSelected
+  ) || touched
   touched = applyDefaultProfile(editor, ctx.options.profile, ctx.options.setDefaultProfile) || touched
   touched = applyNotifications(editor, ctx.options.notificationSound) || touched
 
@@ -88,12 +94,19 @@ function applyProfile(
   editor: TomlEditor,
   scope: InstallerContext['options']['profileScope'],
   profile: InstallerContext['options']['profile'],
-  mode: InstallerContext['options']['profileMode']
+  mode: InstallerContext['options']['profileMode'],
+  selected: InstallerContext['options']['profilesSelected']
 ): boolean {
-  if (scope === 'single' && profile === 'skip') return false
-  const targets = scope === 'all'
-    ? (Object.keys(PROFILE_DEFAULTS) as Profile[])
-    : ([profile] as Profile[])
+  let targets: Profile[] = []
+  if (scope === 'all') {
+    targets = Object.keys(PROFILE_DEFAULTS) as Profile[]
+  } else if (scope === 'selected') {
+    targets = (selected || []) as Profile[]
+  } else {
+    if (profile === 'skip') return false
+    targets = [profile] as Profile[]
+  }
+  if (targets.length === 0) return false
 
   let changed = false
   for (const name of targets) {

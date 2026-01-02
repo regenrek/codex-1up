@@ -1,25 +1,41 @@
 export type Profile = 'balanced' | 'safe' | 'yolo'
 export type ProfileSelection = Profile | 'skip'
 export type ProfileMode = 'add' | 'overwrite'
-export type ProfileScope = 'single' | 'all'
+export type ProfileScope = 'single' | 'all' | 'selected'
 export type InstallMode = 'recommended' | 'manual'
 export type NotifyAction = 'yes' | 'no'
 export type GlobalAgentsAction = 'create-default' | 'overwrite-default' | 'append-default' | 'skip'
+export type SkillsInstallMode = 'skip' | 'all' | 'select'
+export type ToolId =
+  | 'rg'
+  | 'fd'
+  | 'fzf'
+  | 'jq'
+  | 'yq'
+  | 'ast-grep'
+  | 'bat'
+  | 'git'
+  | 'git-delta'
+  | 'gh'
 export type InstallNodeMethod = 'nvm' | 'brew' | 'skip'
 export type PackageManager = 'brew' | 'apt' | 'dnf' | 'pacman' | 'zypper' | 'none'
-export type InstallToolsChoice = 'yes' | 'no'
-export type InstallCodexCliChoice = 'yes' | 'no'
+export type InstallToolsChoice = 'all' | 'skip' | 'select'
+export type InstallCodexCliChoice = 'yes' | 'no' | 'auto'
 
 export interface InstallerOptions {
   profile: ProfileSelection
   profileScope: ProfileScope
   profileMode: ProfileMode
   setDefaultProfile: boolean
+  profilesSelected?: Profile[] | undefined // only used when profileScope === 'selected'
   installTools: InstallToolsChoice
+  toolsSelected?: ToolId[] | undefined // only used when installTools === 'select'
   installCodexCli: InstallCodexCliChoice
   notify: NotifyAction | undefined
   globalAgents: GlobalAgentsAction | undefined
   notificationSound?: string | undefined // 'none' to disable
+  skills: SkillsInstallMode
+  skillsSelected?: string[] | undefined // only used when skills === 'select'
   mode: InstallMode
   installNode: InstallNodeMethod
   shell: string

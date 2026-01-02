@@ -1,0 +1,48 @@
+name: Homebrew Tap
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  update-tap:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 1
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Checkout Homebrew tap
+        uses: actions/checkout@v4
+        with:
+          repository: regenrek/homebrew-tap
+          path: homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+
+      - name: Update formula
+        env:
+          TAP_PATH: ${{ github.workspace }}/homebrew-tap
+          TAG_NAME: ${{ github.ref_name }}
+        run: node scripts/homebrew-update.mjs
+
+      - name: Commit and push
+        working-directory: homebrew-tap
+        run: |
+          if git diff --quiet; then
+            echo "No formula changes to commit."
+            exit 0
+          fi
+          git config user.name "codex-1up bot"
+          git config user.email "codex-1up-bot@users.noreply.github.com"
+          git add Formula/codex-1up.rb
+          git commit -m "feat: update codex-1up to ${GITHUB_REF_NAME}"
+          git push

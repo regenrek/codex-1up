@@ -27,6 +27,15 @@ This project ships via the Node script at `scripts/release.ts`. The script bumps
   - Commit `chore: release vX.Y.Z`, tag `vX.Y.Z`, push
   - Create/Update a GitHub Release with notes from `CHANGELOG.md`
 
+## Homebrew tap update (automatic)
+- A GitHub Actions workflow (`.github/workflows/homebrew-release.yml`) updates `regenrek/homebrew-tap` on each published GitHub Release.
+- Required secret: `HOMEBREW_TAP_GITHUB_TOKEN` with `repo` access to `regenrek/homebrew-tap`.
+- The workflow:
+  - Resolves the release tag version
+  - Pulls the npm tarball from `registry.npmjs.org`
+  - Computes the sha256
+  - Updates `Formula/codex-1up.rb` in the tap and pushes
+
 ## Sanity Checks (optional but recommended)
 - Build and pack locally:
   - `pnpm -C cli build`
@@ -62,4 +71,3 @@ This project ships via the Node script at `scripts/release.ts`. The script bumps
 - `npm ERR! code E403` or auth failures: run `npm login` and retry.
 - `gh` failures: `gh auth status`; ensure `repo` scope exists.
 - Tag push rejected: pull/rebase or fast-forward `main`, then rerun.
-

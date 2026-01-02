@@ -17,8 +17,10 @@ function makeCtx(): InstallerContext {
   const options: InstallerOptions = {
     profile: 'balanced', profileScope: 'single', profileMode: 'add', setDefaultProfile: false,
     installCodexCli: 'yes',
-    installTools: 'no',
+    installTools: 'skip',
+    toolsSelected: undefined,
     notify: 'yes', globalAgents: 'skip',
+    skills: 'skip', skillsSelected: undefined,
     mode: 'manual', installNode: 'skip', shell: 'auto', vscodeId: undefined,
     noVscode: true, agentsMd: undefined, dryRun: false, assumeYes: true, skipConfirmation: true,
     notificationSound: 'none'
