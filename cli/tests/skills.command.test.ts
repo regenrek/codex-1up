@@ -10,10 +10,10 @@ const installSkillsMock = vi.fn(async () => {})
 const removeSkillMock = vi.fn(async () => {})
 
 vi.mock('../src/actions/skills.js', () => ({
-  listBundled: (...args: any[]) => listBundledMock(...args),
-  listInstalled: (...args: any[]) => listInstalledMock(...args),
-  installSkills: (...args: any[]) => installSkillsMock(...args),
-  removeSkill: (...args: any[]) => removeSkillMock(...args)
+  listBundled: listBundledMock,
+  listInstalled: listInstalledMock,
+  installSkills: installSkillsMock,
+  removeSkill: removeSkillMock
 }))
 
 describe('skills command', () => {

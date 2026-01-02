@@ -12,11 +12,11 @@ const listToolDefinitionsMock = vi.fn(() => ([
 const isToolIdMock = vi.fn((value: string) => value === 'rg' || value === 'fd')
 
 vi.mock('../src/actions/tools.js', () => ({
-  installTools: (...args: any[]) => installToolsMock(...args),
-  getToolStatuses: (...args: any[]) => getToolStatusesMock(...args),
-  getAllToolIds: (...args: any[]) => getAllToolIdsMock(...args),
-  listToolDefinitions: (...args: any[]) => listToolDefinitionsMock(...args),
-  isToolId: (...args: any[]) => isToolIdMock(...args)
+  installTools: installToolsMock,
+  getToolStatuses: getToolStatusesMock,
+  getAllToolIds: getAllToolIdsMock,
+  listToolDefinitions: listToolDefinitionsMock,
+  isToolId: isToolIdMock
 }))
 
 describe('tools command', () => {

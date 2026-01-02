@@ -73,7 +73,13 @@ export const installCommand = defineCommand({
     const bundledSkills = await listBundledSkills(repoRoot)
     const availableTools = listToolDefinitions()
 
-    const seededProfile = cliProfileChoice || (isProfile(currentProfile) ? currentProfile : undefined) || 'balanced'
+    const seededProfile = (
+      cliProfileChoice && cliProfileChoice !== 'skip'
+        ? cliProfileChoice
+        : isProfile(currentProfile)
+          ? currentProfile
+          : undefined
+    ) || 'balanced'
     let profileChoice: 'balanced'|'safe'|'yolo'|'skip' = seededProfile
     let profileMode: 'add'|'overwrite' = cliProfileMode || 'add'
     let profileScope: 'single'|'all'|'selected' = cliProfileScope || 'single'
@@ -130,8 +136,7 @@ export const installCommand = defineCommand({
       } else {
         const parts = cliToolsArg.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
         if (parts.length === 0) throw new Error('Invalid --tools value (expected all|skip|<comma-separated tool ids>)')
-        const available = new Set(availableTools.map(t => t.id))
-        const unknown = parts.filter(s => !available.has(s))
+        const unknown = parts.filter(s => !isToolId(s))
         if (unknown.length) {
           const availList = availableTools.map(t => t.id).join(', ') || '(none)'
           throw new Error(`Unknown tool(s): ${unknown.join(', ')}. Available: ${availList}`)

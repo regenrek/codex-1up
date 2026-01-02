@@ -6,7 +6,7 @@ import { updateCommand } from '../src/commands/update'
 const runSelfUpdateMock = vi.fn(async () => 'up-to-date')
 
 vi.mock('../src/actions/selfUpdate.js', () => ({
-  runSelfUpdate: (...args: any[]) => runSelfUpdateMock(...args)
+  runSelfUpdate: runSelfUpdateMock
 }))
 
 vi.mock('../src/actions/context.js', () => ({
