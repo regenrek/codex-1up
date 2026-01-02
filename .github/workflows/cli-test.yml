@@ -6,13 +6,13 @@ on:
     paths:
       - 'cli/**'
       - '.github/workflows/cli-test.yml'
-      - 'cli/pnpm-lock.yaml'
+      - 'pnpm-lock.yaml'
   pull_request:
     branches: [main, develop]
     paths:
       - 'cli/**'
       - '.github/workflows/cli-test.yml'
-      - 'cli/pnpm-lock.yaml'
+      - 'pnpm-lock.yaml'
 
 jobs:
   test:
@@ -44,7 +44,7 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'pnpm'
-          cache-dependency-path: cli/pnpm-lock.yaml
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Get pnpm store directory
         id: pnpm-cache
@@ -57,7 +57,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('cli/pnpm-lock.yaml') }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
 
@@ -118,7 +118,7 @@ jobs:
         with:
           node-version: 20.x
           cache: 'pnpm'
-          cache-dependency-path: cli/pnpm-lock.yaml
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
         working-directory: cli

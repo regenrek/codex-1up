@@ -22,7 +22,7 @@ jobs:
         with:
           node-version: 20
           cache: 'pnpm'
-          cache-dependency-path: cli/pnpm-lock.yaml
+          cache-dependency-path: pnpm-lock.yaml
           
       - name: Install dependencies
         working-directory: cli

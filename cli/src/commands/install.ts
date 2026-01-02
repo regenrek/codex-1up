@@ -144,7 +144,7 @@ export const installCommand = defineCommand({
     }
 
     if (runWizard) {
-      p.log.info(`${PACKAGE_NAME} v${PACKAGE_VERSION} — ${PACKAGE_DESCRIPTION}`)
+      p.log.info(`Codex 1up v${PACKAGE_VERSION} - equips your coding agent with powerful tools`)
       p.log.info('Install wizard')
       const wizardResult = await runInstallWizard({
         repoRoot,
