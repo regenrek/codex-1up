@@ -1,6 +1,7 @@
 import type { InstallerContext } from './types.js'
 import fs from 'fs-extra'
 import * as path from 'path'
+import * as p from '@clack/prompts'
 import { createBackupPath } from './utils.js'
 import { listBundledSkills } from './skills.js'
 
@@ -30,6 +31,11 @@ export async function maybeInstallSkills(ctx: InstallerContext): Promise<void> {
   }
 
   const destRoot = path.join(ctx.homeDir, '.codex', 'skills')
+  const interactive =
+    process.stdout.isTTY &&
+    !ctx.options.dryRun &&
+    !ctx.options.skipConfirmation &&
+    !ctx.options.assumeYes
   if (ctx.options.dryRun) {
     ctx.logger.log(`[dry-run] mkdir -p ${destRoot}`)
   } else {
@@ -42,6 +48,20 @@ export async function maybeInstallSkills(ctx: InstallerContext): Promise<void> {
     const destDir = path.join(destRoot, skill.id)
     const exists = await fs.pathExists(destDir)
     if (exists) {
+      if (interactive) {
+        const choice = await p.select({
+          message: `Skill "${skill.id}" already exists. Overwrite? (backup created)`,
+          options: [
+            { label: 'Overwrite', value: 'overwrite' },
+            { label: 'Skip', value: 'skip' }
+          ],
+          initialValue: 'overwrite'
+        }) as 'overwrite' | 'skip'
+        if (p.isCancel(choice) || choice === 'skip') {
+          ctx.logger.info(`Skipping existing skill: ${skill.id}`)
+          continue
+        }
+      }
       const backup = createBackupPath(destDir)
       if (ctx.options.dryRun) {
         ctx.logger.log(`[dry-run] cp -R ${destDir} ${backup}`)
@@ -61,4 +81,3 @@ export async function maybeInstallSkills(ctx: InstallerContext): Promise<void> {
     ctx.logger.ok(`Installed skill: ${skill.id}`)
   }
 }
-
