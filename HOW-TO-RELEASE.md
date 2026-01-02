@@ -1,12 +1,12 @@
 # How To Release codex-1up
 
-This project ships via the Node script at `scripts/release.ts`. The script bumps versions, builds, publishes to npm, pushes tags, and creates a GitHub Release with notes from `CHANGELOG.md`.
+This project ships via the Node script at `scripts/release.ts`. The script bumps versions, builds, pushes tags, and creates a GitHub Release with notes from `CHANGELOG.md`. Publishing to npm happens automatically via GitHub Actions using npm Trusted Publishing (OIDC).
 
 ## Prerequisites
 - Node 18+
 - pnpm (`corepack enable && corepack prepare pnpm@latest --activate` works too)
 - GitHub CLI (`gh auth status` shows logged in)
-- npm auth: `npm whoami` works; 2FA ready if enabled
+- npm publish is handled by GitHub Actions (Trusted Publishing); no local `npm login` required
 - Clean `main` branch pushed to origin
 
 ## Prepare
@@ -17,15 +17,23 @@ This project ships via the Node script at `scripts/release.ts`. The script bumps
 - Ensure any user-facing docs (README, templates) are committed.
 
 ## Quick Release
-- Patch/minor/major bump and publish:
+- Patch/minor/major bump and release:
   - `pnpm dlx tsx scripts/release.ts patch` (or `minor`/`major`)
 - The script will:
   - Bump `cli/package.json#version`
-  - Copy `templates/`, `scripts/`, `sounds/`, `README.md`, `LICENSE` into `cli/` for packaging
-  - Build (`tsup`) and publish with `--access public`
-  - Clean temporary copies from `cli/`
+  - Build (`tsup`)
   - Commit `chore: release vX.Y.Z`, tag `vX.Y.Z`, push
   - Create/Update a GitHub Release with notes from `CHANGELOG.md`
+  - Trigger the GitHub Actions publish workflow (OIDC) on release publish
+
+## npm Trusted Publishing (automatic)
+- Configure this once in npm:
+  - Go to the package settings → **Access** → **Trusted Publishers**
+  - Add GitHub Actions as a trusted publisher for this repo
+  - Workflow file: `.github/workflows/npm-release.yml`
+  - Environment: leave blank unless you use GitHub Environments
+- GitHub Actions will mint short-lived OIDC credentials at publish time; no stored tokens.
+- The workflow pins npm CLI `11.5.1` to satisfy Trusted Publishing requirements.
 
 ## Homebrew tap update (automatic)
 - A GitHub Actions workflow (`.github/workflows/homebrew-release.yml`) updates `regenrek/homebrew-tap` on each published GitHub Release.
@@ -56,9 +64,8 @@ This project ships via the Node script at `scripts/release.ts`. The script bumps
 - **Verification**: After release, check the GitHub Release page to confirm the changelog description appears correctly. If it's missing, the regex may not have matched—verify the CHANGELOG.md format matches `## [X.Y.Z]` exactly.
 
 ## Prereleases / Dist-Tags
-- To ship a prerelease manually, run the script to tag/commit, then publish with a tag:
-  - `pnpm -C cli publish --no-git-checks --tag next`
-- Or extend `scripts/release.ts` to accept a `--tag` flag (future enhancement).
+- To ship a prerelease, publish a GitHub Release marked **Prerelease**.
+  - The npm workflow will automatically publish with `--tag next`.
 
 ## Rollback / Deprecation
 - Prefer deprecation over unpublish:

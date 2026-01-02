@@ -37,6 +37,18 @@ Publishes preview packages for pull requests using `pkg-pr-new`.
 All CLI workflows are triggered only when changes are made to:
 - `cli/**` - CLI source and test files
 - `.github/workflows/cli-*.yml` - Workflow files themselves
-- `cli/pnpm-lock.yaml` - Dependencies
+- `pnpm-lock.yaml` - Dependencies
 
 This ensures CI runs only when relevant changes are made.
+
+## Release Workflows
+
+### npm-release.yml
+Publishes the CLI to npm using Trusted Publishing (OIDC) when a GitHub Release is published.
+
+**Features:**
+- Builds and publishes `codex-1up` without storing npm tokens
+- Handles prerelease tags with `next`
+
+### homebrew-release.yml
+Updates the Homebrew tap when a GitHub Release is published.
