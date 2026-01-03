@@ -3,23 +3,80 @@ name: Homebrew Tap
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to update (e.g., v0.3.7)'
+        required: true
+        type: string
 
 jobs:
   update-tap:
     runs-on: ubuntu-latest
+    concurrency:
+      group: homebrew-tap-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+      cancel-in-progress: true
     permissions:
       contents: read
     steps:
+      - name: Resolve release context
+        id: release
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            tag="${{ inputs.tag }}"
+            if [[ "$tag" != v* ]]; then
+              tag="v${tag}"
+            fi
+          else
+            tag="${{ github.ref_name }}"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
       - name: Checkout release tag
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref }}
+          ref: ${{ steps.release.outputs.tag }}
           fetch-depth: 1
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 18
+
+      - name: Wait for npm tarball to be available
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          pkg_name="$(node -p "require('./cli/package.json').name")"
+          pkg_version="$(node -p "require('./cli/package.json').version")"
+          tarball_url="https://registry.npmjs.org/${pkg_name}/-/${pkg_name}-${pkg_version}.tgz"
+
+          echo "Waiting for tarball: ${tarball_url}"
+
+          delay_s=5
+          max_attempts=10
+          attempt=0
+          while true; do
+            attempt=$((attempt + 1))
+            http_code="$(curl -sS -o /dev/null -w '%{http_code}' "$tarball_url" || echo '000')"
+            if [ "$http_code" = "200" ]; then
+              echo "Tarball is available (HTTP 200)."
+              break
+            fi
+            if [ "$attempt" -ge "$max_attempts" ]; then
+              echo "Tarball not available after ${attempt} attempts (last HTTP ${http_code})." >&2
+              exit 1
+            fi
+
+            echo "Tarball not yet available (HTTP ${http_code}); retrying in ${delay_s}s (attempt ${attempt}/${max_attempts})..."
+            sleep "$delay_s"
+            delay_s=$((delay_s * 2))
+            if [ "$delay_s" -gt 60 ]; then
+              delay_s=60
+            fi
+          done
 
       - name: Checkout Homebrew tap
         uses: actions/checkout@v4
@@ -31,7 +88,7 @@ jobs:
       - name: Update formula
         env:
           TAP_PATH: ${{ github.workspace }}/homebrew-tap
-          TAG_NAME: ${{ github.ref_name }}
+          TAG_NAME: ${{ steps.release.outputs.tag }}
         run: node scripts/homebrew-update.mjs
 
       - name: Commit and push
