@@ -93,13 +93,15 @@ jobs:
 
       - name: Commit and push
         working-directory: homebrew-tap
+        env:
+          TAG_NAME: ${{ steps.release.outputs.tag }}
         run: |
-          if git diff --quiet; then
-            echo "No formula changes to commit."
-            exit 0
-          fi
           git config user.name "codex-1up bot"
           git config user.email "codex-1up-bot@users.noreply.github.com"
           git add Formula/codex-1up.rb
-          git commit -m "feat: update codex-1up to ${GITHUB_REF_NAME}"
+          if git diff --cached --quiet; then
+            echo "No formula changes to commit."
+            exit 0
+          fi
+          git commit -m "feat: update codex-1up to ${TAG_NAME}"
           git push
