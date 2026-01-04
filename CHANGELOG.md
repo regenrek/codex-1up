@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.3.8] - 2026-01-04
+
+### Changed
+- CI: improved Homebrew release workflow reliability (rerunnable, waits for npm tarball propagation, commits new formula files, uses GitHub App auth).
+- Build/CI: moved pnpm-only config from `.npmrc` to `pnpm-workspace.yaml` to avoid npm warnings on unknown keys.
+
 ## [0.3.7] - 2026-01-03
 
 ### Changed
