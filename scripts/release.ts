@@ -151,16 +151,39 @@ function hasGhCLI(): boolean {
 	}
 }
 
+function escapeRegExp(s: string): string {
+	return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function changelogSection(versionLike: string): string | null {
 	const file = path.resolve("CHANGELOG.md");
 	if (!fs.existsSync(file)) return null;
 	const text = fs.readFileSync(file, "utf8");
-	const re = new RegExp(
-		`^## \\\\[${versionLike.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&")}\\\\]` + "[\\s\\S]*?(?=^## \\\\[(?:.|\\n)*?\\\\]|\n\n?$)",
-		"m",
-	);
-	const m = text.match(re);
-	return m ? m[0].trim() + "\n" : null;
+	const lines = text.split(/\r?\n/);
+
+	const headerRe = new RegExp(`^## \\[${escapeRegExp(versionLike)}\\](?:\\s|$)`);
+	const nextHeaderRe = /^## \[/;
+
+	const start = lines.findIndex((l) => headerRe.test(l));
+	if (start === -1) return null;
+
+	let end = lines.length;
+	for (let i = start + 1; i < lines.length; i++) {
+		if (nextHeaderRe.test(lines[i])) {
+			end = i;
+			break;
+		}
+	}
+
+	const section = lines.slice(start, end).join("\n").trimEnd() + "\n";
+
+	// If the section is just the header (or header + blank lines), treat it as missing.
+	const withoutHeader = section
+		.split(/\r?\n/)
+		.slice(1)
+		.join("\n")
+		.trim();
+	return withoutHeader.length > 0 ? section : null;
 }
 
 function ghReleaseExists(tag: string): boolean {
