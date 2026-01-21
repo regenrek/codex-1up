@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.3.13] - 2026-01-21
+
+### Fixed
+- Homebrew: install `codex-1up` as a symlink to the package entrypoint so it can find `dist/` (avoids falling back to `tsx`).
+
 ## [0.3.12] - 2026-01-21
 
 ### Fixed
