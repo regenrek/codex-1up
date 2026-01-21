@@ -14,8 +14,13 @@ describe('utils helpers', () => {
     const originalGetuid = process.getuid
     Object.defineProperty(process, 'getuid', { value: () => 1000, configurable: true })
     const res = createPrivilegedPmCmd('apt-get')
-    expect(res.cmd).toBe('sudo')
-    expect(res.argsPrefix).toEqual(['apt-get'])
+    if (process.platform === 'win32') {
+      expect(res.cmd).toBe('apt-get')
+      expect(res.argsPrefix).toEqual([])
+    } else {
+      expect(res.cmd).toBe('sudo')
+      expect(res.argsPrefix).toEqual(['apt-get'])
+    }
     Object.defineProperty(process, 'getuid', { value: originalGetuid, configurable: true })
   })
 

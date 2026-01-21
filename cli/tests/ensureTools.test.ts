@@ -153,7 +153,12 @@ describe('ensureTools', () => {
     ;(detectPackageManager as unknown as { mockResolvedValue: (v: unknown) => void }).mockResolvedValue('apt')
     ;(runCommand as unknown as { mockImplementation: (fn: (cmd: string, args: string[]) => Promise<void>) => void }).mockImplementation(
       async (cmd: string, args: string[]) => {
-        if (cmd === 'sudo' && args[0] === 'apt-get' && args[1] === 'update') throw new Error('update failed')
+        // On Windows we don't use sudo; on POSIX we do.
+        if (process.platform === 'win32') {
+          if (cmd === 'apt-get' && args[0] === 'update') throw new Error('update failed')
+        } else {
+          if (cmd === 'sudo' && args[0] === 'apt-get' && args[1] === 'update') throw new Error('update failed')
+        }
       }
     )
     const ctx = createCtx()
@@ -166,8 +171,10 @@ describe('ensureTools', () => {
     ;(runCommand as unknown as { mockImplementation: (fn: (cmd: string, args: string[]) => Promise<void>) => void }).mockImplementation(
       async (cmd: string, args: string[]) => {
         // allow update
-        if (cmd === 'sudo' && args[0] === 'apt-get' && args[1] === 'install' && args.includes('gh')) {
-          throw new Error('install gh failed')
+        if (process.platform === 'win32') {
+          if (cmd === 'apt-get' && args[0] === 'install' && args.includes('gh')) throw new Error('install gh failed')
+        } else {
+          if (cmd === 'sudo' && args[0] === 'apt-get' && args[1] === 'install' && args.includes('gh')) throw new Error('install gh failed')
         }
       }
     )
@@ -180,22 +187,35 @@ describe('ensureTools', () => {
     ;(detectPackageManager as unknown as { mockResolvedValue: (v: unknown) => void }).mockResolvedValue('dnf')
     const ctx = createCtx()
     await ensureTools(ctx)
-    expect(runCommand).toHaveBeenCalledWith('sudo', ['dnf', 'install', '-y', 'ripgrep', 'gh', 'fd-find', 'bat'], expect.any(Object))
+    if (process.platform === 'win32') {
+      expect(runCommand).toHaveBeenCalledWith('dnf', ['install', '-y', 'ripgrep', 'gh', 'fd-find', 'bat'], expect.any(Object))
+    } else {
+      expect(runCommand).toHaveBeenCalledWith('sudo', ['dnf', 'install', '-y', 'ripgrep', 'gh', 'fd-find', 'bat'], expect.any(Object))
+    }
   })
 
   it('runs pacman branch install command (dry-run)', async () => {
     ;(detectPackageManager as unknown as { mockResolvedValue: (v: unknown) => void }).mockResolvedValue('pacman')
     const ctx = createCtx()
     await ensureTools(ctx)
-    expect(runCommand).toHaveBeenCalledWith('sudo', ['pacman', '-Sy', '--noconfirm', 'ripgrep', 'github-cli', 'fd', 'bat'], expect.any(Object))
+    if (process.platform === 'win32') {
+      expect(runCommand).toHaveBeenCalledWith('pacman', ['-Sy', '--noconfirm', 'ripgrep', 'github-cli', 'fd', 'bat'], expect.any(Object))
+    } else {
+      expect(runCommand).toHaveBeenCalledWith('sudo', ['pacman', '-Sy', '--noconfirm', 'ripgrep', 'github-cli', 'fd', 'bat'], expect.any(Object))
+    }
   })
 
   it('runs zypper branch refresh + install (dry-run)', async () => {
     ;(detectPackageManager as unknown as { mockResolvedValue: (v: unknown) => void }).mockResolvedValue('zypper')
     const ctx = createCtx()
     await ensureTools(ctx)
-    expect(runCommand).toHaveBeenCalledWith('sudo', ['zypper', 'refresh'], expect.any(Object))
-    expect(runCommand).toHaveBeenCalledWith('sudo', ['zypper', 'install', '-y', 'ripgrep', 'gh', 'fd', 'bat'], expect.any(Object))
+    if (process.platform === 'win32') {
+      expect(runCommand).toHaveBeenCalledWith('zypper', ['refresh'], expect.any(Object))
+      expect(runCommand).toHaveBeenCalledWith('zypper', ['install', '-y', 'ripgrep', 'gh', 'fd', 'bat'], expect.any(Object))
+    } else {
+      expect(runCommand).toHaveBeenCalledWith('sudo', ['zypper', 'refresh'], expect.any(Object))
+      expect(runCommand).toHaveBeenCalledWith('sudo', ['zypper', 'install', '-y', 'ripgrep', 'gh', 'fd', 'bat'], expect.any(Object))
+    }
   })
 
   it('creates fd/bat aliases when alt binaries exist (dry-run)', async () => {
