@@ -8,7 +8,7 @@ When you need to call tools from the shell, use this rubric:
 
 ## Structured Code Search
 - Find code structure: `ast-grep --lang <language> -p '<pattern>'`
-- List matching files: `ast-grep -l --lang <language> -p '<pattern>' | head -n 10`
+- List matching files: `ast-grep --lang <language> -p '<pattern>' | head -n 10`
 - Prefer `ast-grep` over `rg`/`grep` when you need syntax-aware matching
 
 ## Data Processing
