@@ -41,4 +41,25 @@ describe('tools command', () => {
     await runCommand(toolsCommand, { rawArgs: ['install', 'all'] })
     expect(installToolsMock).toHaveBeenCalledWith('all', expect.any(Object))
   })
+
+  it('errors on unknown tool ids', async () => {
+    isToolIdMock.mockImplementation((value: string) => value === 'rg') // fd becomes unknown
+    await expect(runCommand(toolsCommand, { rawArgs: ['install', 'rg,fd'] })).rejects.toThrow(/Unknown tool id/)
+    expect(getAllToolIdsMock).toHaveBeenCalled()
+  })
+
+  it('doctor prints all installed when none missing', async () => {
+    getToolStatusesMock.mockResolvedValueOnce([{ id: 'rg', installed: true }])
+    await runCommand(toolsCommand, { rawArgs: ['doctor'] })
+    expect(getToolStatusesMock).toHaveBeenCalled()
+  })
+
+  it('doctor prints missing tools and known tools', async () => {
+    getToolStatusesMock.mockResolvedValueOnce([
+      { id: 'rg', installed: false },
+      { id: 'fd', installed: true }
+    ])
+    await runCommand(toolsCommand, { rawArgs: ['doctor'] })
+    expect(listToolDefinitionsMock).toHaveBeenCalled()
+  })
 })

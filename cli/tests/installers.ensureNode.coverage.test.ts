@@ -87,5 +87,56 @@ describe('installers/ensureNode', () => {
     expect(logger.log).toHaveBeenCalledWith('[dry-run] install Homebrew')
     expect(logger.ok).toHaveBeenCalledWith('Node.js installed (v20.12.0)')
   })
+
+  it('nvm dry-run path logs and then verifies node', async () => {
+    const zx = await import('zx')
+    const whichMock = zx.which as unknown as ReturnType<typeof vi.fn>
+    const dollarMock = zx.$ as unknown as ReturnType<typeof vi.fn>
+
+    // First check: node/npm missing. After "install": node present.
+    let nodeChecks = 0
+    whichMock.mockImplementation(async (cmd: string) => {
+      if (cmd === 'node') {
+        nodeChecks++
+        if (nodeChecks === 1) throw new Error('missing')
+        return '/usr/bin/node'
+      }
+      if (cmd === 'npm') throw new Error('missing')
+      return '/usr/bin/ok'
+    })
+
+    dollarMock.mockResolvedValueOnce({ stdout: 'v18.19.0\n' })
+
+    const { ensureNode } = await import('../src/installers/ensureNode.js')
+    const ctx = makeCtx({ options: { installNode: 'nvm', dryRun: true, assumeYes: true, skipConfirmation: true } })
+    await expect(ensureNode(ctx)).resolves.toBeUndefined()
+    expect(logger.log).toHaveBeenCalledWith('[dry-run] install nvm + Node LTS')
+    expect(logger.ok).toHaveBeenCalledWith('Node.js installed (v18.19.0)')
+  })
+
+  it('brew path calls brew install node in dry-run', async () => {
+    const zx = await import('zx')
+    const whichMock = zx.which as unknown as ReturnType<typeof vi.fn>
+    const dollarMock = zx.$ as unknown as ReturnType<typeof vi.fn>
+
+    let nodeChecks = 0
+    whichMock.mockImplementation(async (cmd: string) => {
+      if (cmd === 'node') {
+        nodeChecks++
+        if (nodeChecks === 1) throw new Error('missing')
+        return '/usr/bin/node'
+      }
+      if (cmd === 'npm') throw new Error('missing')
+      if (cmd === 'brew') return '/usr/local/bin/brew'
+      return '/usr/bin/ok'
+    })
+    dollarMock.mockResolvedValueOnce({ stdout: 'v20.12.0\n' })
+
+    const { ensureNode } = await import('../src/installers/ensureNode.js')
+    const ctx = makeCtx({ options: { installNode: 'brew', dryRun: true, assumeYes: true, skipConfirmation: true } })
+    await expect(ensureNode(ctx)).resolves.toBeUndefined()
+    expect(logger.log).toHaveBeenCalledWith('[dry-run] brew install node')
+    expect(logger.ok).toHaveBeenCalledWith('Node.js installed (v20.12.0)')
+  })
 })
 

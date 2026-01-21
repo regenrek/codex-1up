@@ -6,7 +6,7 @@
 **Codex 1UP** equips your Codex CLI coding agent with powerful tools.
 
 - ✅ Installs/updates **Codex CLI** (`@openai/codex`)
-- ✅ Adds fast shell power tools: `rg`, `fd`, `fzf`, `jq`, `yq`, `ast-grep`, `bat`, `git`, `git-delta`, `gh`
+- ✅ Adds fast shell power tools: `rg`, `fd`, `fzf`, `jq`, `yq`, `ast-grep`, `bat`, `git`, `git-delta`, `gh` (GitHub CLI)
 - ✅ **AGENTS.md** template with tool selection guide
 - ✅ Unified **Codex config** with multiple profiles: `balanced` / `safe` / `yolo`
 - ✅ 🔊 **Notification sounds** with customizable audio alerts for Codex events
@@ -53,7 +53,7 @@ codex-1up install
 | **bat**                   | Better `cat` with syntax highlighting.                                                 |
 | **git**                   | Version control CLI (required for many workflows).                                     |
 | **git-delta**             | Better `git diff` output formatting.                                                   |
-| **gh**                    | GitHub CLI for repo and PR workflows.                                                  |
+| **gh**                    | GitHub CLI for repo and PR workflows (installed/updated by `codex-1up` in the tools step). |
 | **\~/.codex/config.toml** | Single template with multiple profiles. Active profile is chosen during install (default: `balanced`). See [Codex config reference](https://github.com/openai/codex/blob/main/docs/config.md). |
 | **AGENTS.md**             | Minimal per‑repo rubric; installer can also create global `~/.codex/AGENTS.md`.         |
 | **\~/.codex/skills**      | Optional bundled Agent Skills (portable folders with `SKILL.md` + scripts/references). |

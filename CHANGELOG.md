@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.3.10] - 2026-01-21
+
+### Changed
+- Installer/template: default `model_reasoning_summary` is now `"detailed"` for `*-codex` models.
+- Templates: refreshed `AGENTS-default.md` with concise operating rules (skills/prompts, security, git/PRs, coding style).
+- Release docs: document test/coverage expectations before release.
+
+### Fixed
+- Installer: ensure GitHub CLI (`gh`) installs reliably on apt-based systems by setting up the official GitHub CLI apt repo when needed.
+- Config patcher: normalize invalid `model_reasoning_summary` values for `*-codex` models (see [Codex changelog](https://developers.openai.com/codex/changelog)). Thanks to [@calinfaja](https://github.com/calinfaja) for the report ([#34](https://github.com/regenrek/codex-1up/issues/34)).
+
+### Added
+- Tests: additional coverage around config patching and installer behavior.
+
 ## [0.3.9] - 2026-01-21
 
 ### Fixed

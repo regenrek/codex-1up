@@ -169,5 +169,78 @@ describe('runInstallWizard (extra coverage)', () => {
     expect(res).toBeNull()
     await fs.rm(input.repoRoot, { recursive: true, force: true })
   })
+
+  it('covers previewAgentsTemplate long preview and initialProfileValue fallback', async () => {
+    const input = await makeInput()
+
+    // Make template long enough to trigger "... (N more lines)".
+    const longTemplate = [
+      '# AGENTS',
+      '',
+      '## Section A',
+      ...Array.from({ length: 60 }, (_, i) => `- line ${i + 1}`)
+    ].join('\n')
+    await fs.writeFile(resolve(input.repoRoot, 'templates', 'agent-templates', 'AGENTS-default.md'), longTemplate, 'utf8')
+
+    // Force profileScope single and an unknown current profile so initialProfileValue falls back.
+    input.selections.profileScope = 'single'
+    input.currentProfile = 'not-a-profile'
+
+    // Choose a single profile (covers the single-profile select path).
+    promptState.selects.push((msg) => (msg.includes('Choose a Codex profile to install') ? 'safe' : undefined))
+    // Mode prompt for single profile
+    promptState.selects.push((msg) => (msg.startsWith('How should we write profiles.safe') ? 'overwrite' : undefined))
+    // Confirm default profile for single profile
+    promptState.confirms.push(() => true)
+
+    // Sound: choose none, preview, then use
+    promptState.selects.push((msg) => (msg === 'Notification sound' ? 'none' : undefined))
+    promptState.selects.push((msg) => (msg.startsWith('Selected:') ? 'preview' : undefined))
+    promptState.selects.push((msg) => (msg.startsWith('Selected:') ? 'use' : undefined))
+
+    // Global agents: preview (triggers long preview), then skip
+    promptState.selects.push((msg) => (msg.includes('Global ~/.codex/AGENTS.md') ? 'preview' : undefined))
+    promptState.selects.push((msg) => (msg.includes('Global ~/.codex/AGENTS.md') ? 'skip' : undefined))
+
+    const { runInstallWizard } = await import('../src/flows/installWizard.js')
+    const res = await runInstallWizard(input as any)
+    expect(res).not.toBeNull()
+    await fs.rm(input.repoRoot, { recursive: true, force: true })
+  })
+
+  it('covers previewAgentsTemplate missing/empty warnings', async () => {
+    const input = await makeInput()
+
+    // Remove template to trigger "not found" warning.
+    await fs.rm(resolve(input.repoRoot, 'templates', 'agent-templates', 'AGENTS-default.md'), { force: true })
+
+    // Skip tools prompt by providing cliArgs.toolsArg
+    input.cliArgs.toolsArg = 'skip'
+    // Profiles: skip any profile changes
+    promptState.selects.push((msg) => (msg.includes('Install all profiles') ? 'skip' : undefined))
+    // Sound: skip
+    promptState.selects.push((msg) => (msg === 'Notification sound' ? 'skip' : undefined))
+    // Global agents: preview then skip (preview should warn about missing template)
+    promptState.selects.push((msg) => (msg.includes('Global ~/.codex/AGENTS.md') ? 'preview' : undefined))
+    promptState.selects.push((msg) => (msg.includes('Global ~/.codex/AGENTS.md') ? 'skip' : undefined))
+
+    const { runInstallWizard } = await import('../src/flows/installWizard.js')
+    const res1 = await runInstallWizard(input as any)
+    expect(res1).not.toBeNull()
+
+    // Now create an empty template to trigger "empty" warning.
+    await fs.mkdir(resolve(input.repoRoot, 'templates', 'agent-templates'), { recursive: true })
+    await fs.writeFile(resolve(input.repoRoot, 'templates', 'agent-templates', 'AGENTS-default.md'), '\n', 'utf8')
+
+    promptState.selects.push((msg) => (msg.includes('Install all profiles') ? 'skip' : undefined))
+    promptState.selects.push((msg) => (msg === 'Notification sound' ? 'skip' : undefined))
+    promptState.selects.push((msg) => (msg.includes('Global ~/.codex/AGENTS.md') ? 'preview' : undefined))
+    promptState.selects.push((msg) => (msg.includes('Global ~/.codex/AGENTS.md') ? 'skip' : undefined))
+
+    const res2 = await runInstallWizard(input as any)
+    expect(res2).not.toBeNull()
+
+    await fs.rm(input.repoRoot, { recursive: true, force: true })
+  })
 })
 
