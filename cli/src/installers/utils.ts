@@ -42,6 +42,8 @@ export async function detectPackageManager(): Promise<PackageManager> {
 //   - If running as root, call the pm binary directly (e.g. "apt-get").
 //   - Otherwise, prefix with "sudo" (e.g. "sudo apt-get").
 export function createPrivilegedPmCmd(pmCmd: string): { cmd: string; argsPrefix: string[] } {
+  // Windows doesn't have sudo; treat as unprivileged/no-prefix.
+  if (process.platform === 'win32') return { cmd: pmCmd, argsPrefix: [] }
   const isRoot = typeof process.getuid === 'function' && process.getuid() === 0
   if (isRoot) return { cmd: pmCmd, argsPrefix: [] }
   return { cmd: 'sudo', argsPrefix: [pmCmd] }

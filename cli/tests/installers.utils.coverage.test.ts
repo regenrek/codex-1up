@@ -52,17 +52,29 @@ describe('installers/utils', () => {
   it('createPrivilegedPmCmd uses sudo when non-root', async () => {
     const { createPrivilegedPmCmd } = await import('../src/installers/utils.js')
 
-    const getuid = typeof process.getuid === 'function' ? vi.spyOn(process, 'getuid').mockReturnValue(501) : null
+    // On Windows we never use sudo.
+    if (process.platform === 'win32' || typeof process.getuid !== 'function') {
+      expect(createPrivilegedPmCmd('apt-get')).toEqual({ cmd: 'apt-get', argsPrefix: [] })
+      return
+    }
+
+    const getuid = vi.spyOn(process, 'getuid').mockReturnValue(501)
     expect(createPrivilegedPmCmd('apt-get')).toEqual({ cmd: 'sudo', argsPrefix: ['apt-get'] })
-    getuid?.mockRestore()
+    getuid.mockRestore()
   })
 
   it('createPrivilegedPmCmd does not use sudo when root', async () => {
     const { createPrivilegedPmCmd } = await import('../src/installers/utils.js')
 
-    const getuid = typeof process.getuid === 'function' ? vi.spyOn(process, 'getuid').mockReturnValue(0) : null
+    // On Windows (or other platforms without getuid) we never use sudo.
+    if (process.platform === 'win32' || typeof process.getuid !== 'function') {
+      expect(createPrivilegedPmCmd('apt-get')).toEqual({ cmd: 'apt-get', argsPrefix: [] })
+      return
+    }
+
+    const getuid = vi.spyOn(process, 'getuid').mockReturnValue(0)
     expect(createPrivilegedPmCmd('apt-get')).toEqual({ cmd: 'apt-get', argsPrefix: [] })
-    getuid?.mockRestore()
+    getuid.mockRestore()
   })
 
   it('chooseNodePmForGlobal prefers pnpm when bin dir is configured', async () => {
