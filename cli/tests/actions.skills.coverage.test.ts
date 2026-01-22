@@ -7,7 +7,9 @@ const td = join(tmpdir(), `codex-1up-test-${Date.now()}-skills`)
 
 describe('actions/skills (extra coverage)', () => {
   beforeAll(async () => {
+    // Cross-platform: os.homedir() uses HOME on unix and USERPROFILE on Windows.
     process.env.HOME = td
+    process.env.USERPROFILE = td
     await fs.mkdir(resolve(td, '.codex', 'skills'), { recursive: true })
   })
 
