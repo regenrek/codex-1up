@@ -44,6 +44,7 @@ export async function maybeInstallSkills(ctx: InstallerContext): Promise<void> {
 
   ctx.logger.info(`Installing ${selected.length} skill(s) into: ${destRoot}`)
 
+  const installedSkillIds: string[] = []
   for (const skill of selected) {
     const destDir = path.join(destRoot, skill.id)
     const exists = await fs.pathExists(destDir)
@@ -79,5 +80,45 @@ export async function maybeInstallSkills(ctx: InstallerContext): Promise<void> {
       await fs.copy(skill.srcDir, destDir)
     }
     ctx.logger.ok(`Installed skill: ${skill.id}`)
+    installedSkillIds.push(skill.id)
   }
+
+  if (installedSkillIds.length > 0) {
+    const cfgPath = path.join(ctx.homeDir, '.codex', 'config.toml')
+    if (await fs.pathExists(cfgPath)) {
+      await ensureSkillsConfigEntries(cfgPath, installedSkillIds, ctx)
+    } else {
+      ctx.logger.info(`Config not found at ${cfgPath}; skipping skills.config entries`)
+    }
+  }
+}
+
+async function ensureSkillsConfigEntries(
+  cfgPath: string,
+  skillIds: string[],
+  ctx: InstallerContext
+): Promise<void> {
+  const skillPaths = skillIds.map(id => path.join(ctx.homeDir, '.codex', 'skills', id, 'SKILL.md'))
+  if (ctx.options.dryRun) {
+    ctx.logger.log(`[dry-run] update ${cfgPath} (add skills.config entries)`)
+    return
+  }
+
+  const original = await fs.readFile(cfgPath, 'utf8')
+  const missing = skillPaths.filter(p => !original.includes(`path = "${p}"`))
+  if (missing.length === 0) return
+
+  const hasSkillsTable = /^\s*\[skills\]\s*$/m.test(original)
+  const blocks: string[] = []
+  if (!hasSkillsTable) blocks.push('[skills]')
+  for (const pth of missing) {
+    blocks.push('[[skills.config]]')
+    blocks.push('enabled = true')
+    blocks.push(`path = "${pth}"`)
+    blocks.push('')
+  }
+
+  const next = original.replace(/\s*$/, '\n\n') + blocks.join('\n').trimEnd() + '\n'
+  await fs.writeFile(cfgPath, next, 'utf8')
+  ctx.logger.ok(`Registered ${missing.length} skill(s) in config (skills.config)`)
 }

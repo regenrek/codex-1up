@@ -7,6 +7,9 @@ import { getCodexStatus } from '../actions/codex.js'
 import { getToolStatuses, isToolId, type ToolDefinition } from '../actions/tools.js'
 import type {
   GlobalAgentsAction,
+  CredentialsStoreChoice,
+  ExperimentalFeature,
+  FileOpenerChoice,
   InstallCodexCliChoice,
   InstallToolsChoice,
   NotifyAction,
@@ -15,6 +18,7 @@ import type {
   ProfileScope,
   ProfileSelection,
   SkillsInstallMode,
+  TuiAltScreenChoice,
   ToolId
 } from '../installers/types.js'
 import type { BundledSkill } from '../actions/skills.js'
@@ -33,6 +37,12 @@ export interface InstallSelections {
   notificationSound?: string | undefined
   skillsMode: SkillsInstallMode
   skillsSelected?: string[] | undefined
+  webSearch?: 'disabled' | 'cached' | 'live' | 'skip' | undefined
+  fileOpener?: FileOpenerChoice | undefined
+  credentialsStore?: CredentialsStoreChoice | undefined
+  enableTui2: boolean
+  tuiAlternateScreen?: TuiAltScreenChoice | undefined
+  experimentalFeatures?: ExperimentalFeature[] | undefined
 }
 
 export interface InstallWizardInput {
@@ -50,6 +60,12 @@ export interface InstallWizardInput {
     soundArg?: string
     toolsArg?: string
     skillsArg?: string
+    webSearchArg?: string
+    fileOpenerArg?: string
+    credentialsStoreArg?: string
+    tui2Arg?: boolean
+    altScreenArg?: string
+    experimentalArg?: string
   }
   selections: InstallSelections
 }
@@ -85,7 +101,13 @@ export async function runInstallWizard(input: InstallWizardInput): Promise<Insta
     globalAgentsAction,
     notificationSound,
     skillsMode,
-    skillsSelected
+    skillsSelected,
+    webSearch,
+    fileOpener,
+    credentialsStore,
+    enableTui2,
+    tuiAlternateScreen,
+    experimentalFeatures
   } = input.selections
 
   const wizardLogger = {
@@ -327,6 +349,101 @@ export async function runInstallWizard(input: InstallWizardInput): Promise<Insta
     profileMode = modeResponse
   }
 
+  // --- Advanced config options (Codex v0.88 config keys) -------------------
+
+  if (selectedProfiles.length > 0 && !cliArgs.webSearchArg) {
+    const ws = await p.select({
+      message: 'Web search mode (for selected profiles)',
+      options: [
+        { label: 'Skip (leave unchanged)', value: 'skip' },
+        { label: 'Disabled', value: 'disabled', hint: 'no web search tool calls' },
+        { label: 'Cached', value: 'cached', hint: 'no network; may use cached results' },
+        { label: 'Live', value: 'live', hint: 'requires sandbox network access' }
+      ],
+      initialValue: (webSearch && webSearch !== 'skip') ? webSearch : 'live'
+    }) as 'disabled' | 'cached' | 'live' | 'skip'
+    if (p.isCancel(ws)) return cancelWizard()
+    webSearch = ws
+  }
+
+  if (!cliArgs.fileOpenerArg) {
+    const opener = await p.select({
+      message: 'Citation file opener (optional)',
+      options: [
+        { label: 'Skip (leave unchanged)', value: 'skip' },
+        { label: 'Cursor', value: 'cursor' },
+        { label: 'VS Code', value: 'vscode' },
+        { label: 'VS Code Insiders', value: 'vscode-insiders' },
+        { label: 'Windsurf', value: 'windsurf' },
+        { label: 'None (disable citation links)', value: 'none' }
+      ],
+      initialValue: fileOpener && fileOpener !== 'skip' ? fileOpener : 'skip'
+    }) as FileOpenerChoice
+    if (p.isCancel(opener)) return cancelWizard()
+    fileOpener = opener
+  }
+
+  if (!cliArgs.credentialsStoreArg) {
+    const store = await p.select({
+      message: 'Credential storage (recommended: auto)',
+      options: [
+        { label: 'Skip (leave unchanged)', value: 'skip' },
+        { label: 'Auto (prefer keyring, fallback to file)', value: 'auto' },
+        { label: 'Keyring only', value: 'keyring' },
+        { label: 'File only', value: 'file' }
+      ],
+      initialValue: credentialsStore && credentialsStore !== 'skip' ? credentialsStore : 'auto'
+    }) as CredentialsStoreChoice
+    if (p.isCancel(store)) return cancelWizard()
+    credentialsStore = store
+  }
+
+  if (typeof cliArgs.tui2Arg === 'undefined') {
+    const tui2 = await p.confirm({
+      message: 'Enable TUI2 (experimental UI path in Codex)?',
+      initialValue: enableTui2
+    })
+    if (p.isCancel(tui2)) return cancelWizard()
+    enableTui2 = Boolean(tui2)
+  }
+
+  if (!cliArgs.altScreenArg) {
+    const alt = await p.select({
+      message: 'Alternate screen mode (scrollback-friendly terminals)',
+      options: [
+        { label: 'Skip (leave unchanged)', value: 'skip' },
+        { label: 'Auto (recommended)', value: 'auto' },
+        { label: 'Always', value: 'always' },
+        { label: 'Never (best scrollback)', value: 'never' }
+      ],
+      initialValue: (tuiAlternateScreen && tuiAlternateScreen !== 'skip') ? tuiAlternateScreen : 'auto'
+    }) as TuiAltScreenChoice
+    if (p.isCancel(alt)) return cancelWizard()
+    tuiAlternateScreen = alt
+  }
+
+  if (!cliArgs.experimentalArg) {
+    p.log.info('Optional experimental feature toggles (Codex v0.88+)')
+    p.log.info('Tip: press Esc to go back.')
+    const picked = await multiselectWithBack({
+      message: 'Enable experimental features (optional)',
+      options: [
+        { label: 'Background terminal', value: 'background-terminal' },
+        { label: 'Shell snapshot', value: 'shell-snapshot' },
+        { label: 'Multi-agents (spawn other agents)', value: 'multi-agents' },
+        { label: 'Steer conversation', value: 'steering' },
+        { label: 'Collaboration modes (/collab)', value: 'collaboration-modes' },
+        { label: 'Child-agent project docs (extra AGENTS.md guidance)', value: 'child-agent-project-docs' }
+      ]
+    })
+    if (picked === 'back') {
+      experimentalFeatures = undefined
+    } else {
+      const chosen = Array.isArray(picked) ? picked.map(s => String(s).trim()).filter(Boolean) : []
+      experimentalFeatures = chosen.filter(isExperimentalFeature)
+    }
+  }
+
   if (selectedProfiles.length === 0) {
     setDefaultProfile = false
   } else if (selectedProfiles.length === 1) {
@@ -540,7 +657,13 @@ export async function runInstallWizard(input: InstallWizardInput): Promise<Insta
       globalAgentsAction,
       notificationSound,
       skillsMode,
-      skillsSelected
+      skillsSelected,
+      webSearch,
+      fileOpener,
+      credentialsStore,
+      enableTui2,
+      tuiAlternateScreen,
+      experimentalFeatures
     }
   }
 }
@@ -616,6 +739,15 @@ function initialProfileValue(currentProfile: string | undefined): 'balanced'|'sa
 
 function isProfile(value: unknown): value is 'balanced'|'safe'|'yolo' {
   return value === 'balanced' || value === 'safe' || value === 'yolo'
+}
+
+function isExperimentalFeature(value: string): value is ExperimentalFeature {
+  return value === 'background-terminal' ||
+    value === 'shell-snapshot' ||
+    value === 'multi-agents' ||
+    value === 'steering' ||
+    value === 'collaboration-modes' ||
+    value === 'child-agent-project-docs'
 }
 
 function cancelWizard(): null {

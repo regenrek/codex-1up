@@ -21,6 +21,12 @@ function makeCtx(): InstallerContext {
     toolsSelected: undefined,
     notify: 'yes', globalAgents: 'skip',
     skills: 'skip', skillsSelected: undefined,
+    webSearch: undefined,
+    fileOpener: undefined,
+    credentialsStore: undefined,
+    enableTui2: false,
+    tuiAlternateScreen: undefined,
+    experimentalFeatures: undefined,
     mode: 'manual', installNode: 'skip', shell: 'auto', vscodeId: undefined,
     noVscode: true, agentsMd: undefined, dryRun: false, assumeYes: true, skipConfirmation: true,
     notificationSound: 'none'

@@ -17,13 +17,11 @@ const PROFILE_DEFAULTS: Record<Profile, ProfileDefaults> = {
       ['model', '"gpt-5.2-codex"'],
       ['model_reasoning_effort', '"medium"'],
       // gpt-5.2-codex only supports reasoning.summary = "detailed" (or omitting the field).
-      ['model_reasoning_summary', '"detailed"']
+      ['model_reasoning_summary', '"detailed"'],
+      // Codex v0.88+: web search mode.
+      ['web_search', '"cached"']
     ],
-    features: [['web_search_request', 'true']],
-    tables: {
-      // Required for web search (and other networked commands) in workspace-write sandbox.
-      sandbox_workspace_write: [['network_access', 'true']]
-    }
+    features: []
   },
   safe: {
     root: [
@@ -32,9 +30,10 @@ const PROFILE_DEFAULTS: Record<Profile, ProfileDefaults> = {
       ['model', '"gpt-5.2-codex"'],
       ['model_reasoning_effort', '"medium"'],
       // gpt-5.2-codex only supports reasoning.summary = "detailed" (or omitting the field).
-      ['model_reasoning_summary', '"detailed"']
+      ['model_reasoning_summary', '"detailed"'],
+      ['web_search', '"disabled"']
     ],
-    features: [['web_search_request', 'false']]
+    features: []
   },
   yolo: {
     root: [
@@ -42,9 +41,10 @@ const PROFILE_DEFAULTS: Record<Profile, ProfileDefaults> = {
       ['sandbox_mode', '"danger-full-access"'],
       ['model', '"gpt-5.2-codex"'],
       ['model_reasoning_effort', '"high"'],
-      ['model_reasoning_summary', '"detailed"']
+      ['model_reasoning_summary', '"detailed"'],
+      ['web_search', '"live"']
     ],
-    features: [['web_search_request', 'true']]
+    features: []
   }
 }
 
@@ -69,6 +69,11 @@ export async function writeCodexConfig(ctx: InstallerContext): Promise<void> {
   ) || touched
   touched = applyDefaultProfile(editor, ctx.options.profile, ctx.options.setDefaultProfile) || touched
   touched = applyNotifications(editor, ctx.options.notificationSound) || touched
+  touched = applyWebSearchOverride(editor, ctx) || touched
+  touched = applyFileOpener(editor, ctx) || touched
+  touched = applyCredentialsStore(editor, ctx) || touched
+  touched = applyTuiAlternateScreen(editor, ctx) || touched
+  touched = applyExperimentalFeatureToggles(editor, ctx) || touched
   touched = normalizeReasoningSummaryForCodexModels(editor) || touched
 
   if (!touched) {
@@ -118,7 +123,9 @@ function applyProfile(
     const defaults = PROFILE_DEFAULTS[name]
     if (mode === 'overwrite') {
       changed = editor.replaceTable(`profiles.${name}`, defaults.root) || changed
-      changed = editor.replaceTable(`profiles.${name}.features`, defaults.features) || changed
+      if (defaults.features.length > 0) {
+        changed = editor.replaceTable(`profiles.${name}.features`, defaults.features) || changed
+      }
       for (const [table, lines] of Object.entries(defaults.tables || {})) {
         changed = editor.replaceTable(`profiles.${name}.${table}`, lines) || changed
       }
@@ -127,9 +134,11 @@ function applyProfile(
       for (const [key, value] of defaults.root) {
         changed = editor.setKey(`profiles.${name}`, key, value, { mode: 'if-missing' }) || changed
       }
-      editor.ensureTable(`profiles.${name}.features`)
-      for (const [key, value] of defaults.features) {
-        changed = editor.setKey(`profiles.${name}.features`, key, value, { mode: 'if-missing' }) || changed
+      if (defaults.features.length > 0) {
+        editor.ensureTable(`profiles.${name}.features`)
+        for (const [key, value] of defaults.features) {
+          changed = editor.setKey(`profiles.${name}.features`, key, value, { mode: 'if-missing' }) || changed
+        }
       }
       for (const [table, lines] of Object.entries(defaults.tables || {})) {
         editor.ensureTable(`profiles.${name}.${table}`)
@@ -158,6 +167,100 @@ function applyNotifications(editor: TomlEditor, sound: string | undefined): bool
     }
   }
   return editor.setKey('tui', 'notifications', 'true', { mode: 'force' })
+}
+
+function applyWebSearchOverride(editor: TomlEditor, ctx: InstallerContext): boolean {
+  const choice = ctx.options.webSearch
+  if (!choice || choice === 'skip') return false
+
+  const targets = resolveProfileTargets(ctx.options.profileScope, ctx.options.profile, ctx.options.profilesSelected)
+  if (targets.length === 0) return false
+
+  let changed = false
+  for (const name of targets) {
+    changed = editor.setKey(`profiles.${name}`, 'web_search', `"${choice}"`, { mode: 'force' }) || changed
+    if (choice === 'live') {
+      // Couple live web search with sandbox network access for workspace-write sandboxes.
+      editor.ensureTable(`profiles.${name}.sandbox_workspace_write`)
+      changed =
+        editor.setKey(`profiles.${name}.sandbox_workspace_write`, 'network_access', 'true', { mode: 'force' }) || changed
+    }
+  }
+  return changed
+}
+
+function applyFileOpener(editor: TomlEditor, ctx: InstallerContext): boolean {
+  const opener = ctx.options.fileOpener
+  if (!opener || opener === 'skip') return false
+  // Codex schema uses "none" to disable URI-based openers.
+  return editor.setRootKey('file_opener', `"${opener}"`, { mode: 'force' })
+}
+
+function applyCredentialsStore(editor: TomlEditor, ctx: InstallerContext): boolean {
+  const choice = ctx.options.credentialsStore
+  if (choice === 'skip') return false
+  // Default behavior: set to auto if missing.
+  const value = `"${choice || 'auto'}"`
+  const mode: SetKeyOptions['mode'] = choice ? 'force' : 'if-missing'
+  let changed = false
+  changed = editor.setRootKey('cli_auth_credentials_store', value, { mode }) || changed
+  changed = editor.setRootKey('mcp_oauth_credentials_store', value, { mode }) || changed
+  return changed
+}
+
+function applyTuiAlternateScreen(editor: TomlEditor, ctx: InstallerContext): boolean {
+  const choice = ctx.options.tuiAlternateScreen
+  if (!choice || choice === 'skip') return false
+  editor.ensureTable('tui')
+  return editor.setKey('tui', 'alternate_screen', `"${choice}"`, { mode: 'force' })
+}
+
+function applyExperimentalFeatureToggles(editor: TomlEditor, ctx: InstallerContext): boolean {
+  const targets = resolveProfileTargets(ctx.options.profileScope, ctx.options.profile, ctx.options.profilesSelected)
+  if (targets.length === 0) return false
+
+  const flags: Array<{ key: string; enabled: boolean }> = [
+    { key: 'tui2', enabled: Boolean(ctx.options.enableTui2) }
+  ]
+
+  for (const f of ctx.options.experimentalFeatures || []) {
+    if (f === 'background-terminal') {
+      flags.push({ key: 'shell_tool', enabled: true })
+    } else if (f === 'shell-snapshot') {
+      flags.push({ key: 'shell_snapshot', enabled: true })
+    } else if (f === 'multi-agents') {
+      flags.push({ key: 'collab', enabled: true })
+    } else if (f === 'steering') {
+      flags.push({ key: 'steer', enabled: true })
+    } else if (f === 'collaboration-modes') {
+      flags.push({ key: 'collaboration_modes', enabled: true })
+    } else if (f === 'child-agent-project-docs') {
+      flags.push({ key: 'child_agents_md', enabled: true })
+    }
+  }
+
+  const wanted = flags.filter(f => f.enabled)
+  if (wanted.length === 0) return false
+
+  let changed = false
+  for (const name of targets) {
+    editor.ensureTable(`profiles.${name}.features`)
+    for (const { key } of wanted) {
+      changed = editor.setKey(`profiles.${name}.features`, key, 'true', { mode: 'force' }) || changed
+    }
+  }
+  return changed
+}
+
+function resolveProfileTargets(
+  scope: InstallerContext['options']['profileScope'],
+  profile: InstallerContext['options']['profile'],
+  selected: InstallerContext['options']['profilesSelected']
+): Profile[] {
+  if (scope === 'all') return Object.keys(PROFILE_DEFAULTS) as Profile[]
+  if (scope === 'selected') return (selected || []) as Profile[]
+  if (profile === 'skip') return []
+  return [profile] as Profile[]
 }
 
 interface SetKeyOptions {
@@ -462,11 +565,13 @@ function migrateExperimentalWindowsSandboxFlag(toml: string): { toml: string; ch
 function migrateLegacyRootFeatureFlags(toml: string): { toml: string; changed: boolean } {
   // Codex CLI deprecated a number of root-level booleans in favor of [features].*
   // Keep this list intentionally small and high-confidence.
-  const MAPPINGS: Array<{ oldKey: string; newKey: string }> = [
-    { oldKey: 'experimental_use_exec_command_tool', newKey: 'streamable_shell' },
+  const MAPPINGS: Array<{ oldKey: string; newKey?: string }> = [
+    { oldKey: 'experimental_use_exec_command_tool', newKey: 'shell_tool' },
     { oldKey: 'experimental_use_unified_exec_tool', newKey: 'unified_exec' },
-    { oldKey: 'experimental_use_rmcp_client', newKey: 'rmcp_client' },
-    { oldKey: 'include_apply_patch_tool', newKey: 'apply_patch_freeform' }
+    { oldKey: 'experimental_use_freeform_apply_patch', newKey: 'apply_patch_freeform' },
+    { oldKey: 'include_apply_patch_tool', newKey: 'include_apply_patch_tool' },
+    // Deprecated/removed upstream; drop without mapping.
+    { oldKey: 'experimental_use_rmcp_client' }
   ]
 
   const hasAny = MAPPINGS.some(m => toml.includes(m.oldKey))
@@ -499,7 +604,7 @@ function migrateLegacyRootFeatureFlags(toml: string): { toml: string; changed: b
         const m = line.match(new RegExp(`^\\s*${escapeRegExp(oldKey)}\\s*=\\s*(.+?)\\s*$`))
         if (m) {
           const rhs = parseBoolRhs(m[1])
-          if (rhs !== undefined) wanted[newKey] = rhs
+          if (newKey && rhs !== undefined) wanted[newKey] = rhs
           changed = true
           migrated = true
           break
@@ -516,6 +621,7 @@ function migrateLegacyRootFeatureFlags(toml: string): { toml: string; changed: b
 
   // Insert each migrated feature into [features] if not already present.
   for (const { newKey } of MAPPINGS) {
+    if (!newKey) continue
     const rhs = wanted[newKey]
     if (rhs === undefined) continue
 

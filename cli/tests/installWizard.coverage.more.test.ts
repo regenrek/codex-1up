@@ -106,7 +106,14 @@ describe('runInstallWizard (extra coverage)', () => {
         globalAgentsAction: undefined,
         notificationSound: undefined,
         skillsMode: 'skip' as const,
-        skillsSelected: undefined
+        skillsSelected: undefined,
+        webSearch: 'skip',
+        fileOpener: 'skip',
+        credentialsStore: 'auto',
+        scaffoldMcpServers: false,
+        enableTui2: false,
+        tuiAlternateScreen: 'skip',
+        experimentalFeatures: undefined
       }
     }
   }
@@ -153,6 +160,12 @@ describe('runInstallWizard (extra coverage)', () => {
 
     // Skip tool prompt by providing cliArgs.toolsArg
     input.cliArgs.toolsArg = 'skip'
+    // Skip new advanced prompts so this test can focus on sound + cancellation behavior.
+    input.cliArgs.fileOpenerArg = 'skip'
+    input.cliArgs.credentialsStoreArg = 'skip'
+    input.cliArgs.tui2Arg = false
+    input.cliArgs.altScreenArg = 'skip'
+    input.cliArgs.experimentalArg = 'skip'
 
     // Profiles: skip installing any profiles
     promptState.selects.push((msg) => (msg.includes('Install all profiles') ? 'skip' : undefined))

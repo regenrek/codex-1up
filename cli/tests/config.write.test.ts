@@ -17,17 +17,17 @@ beforeAll(async () => {
 afterAll(async () => { try { await fs.rm(td, { recursive: true, force: true }) } catch {} })
 
 describe('config init/write', () => {
-  it('writes unified config with profiles and features.web_search_request', async () => {
+  it('writes unified config with profiles and web_search mode', async () => {
     await runCommand(root, { rawArgs: ['config', 'init', '--force'] })
     const data = await fs.readFile(CFG, 'utf8')
     expect(data).toMatch(/\[profiles\./)
-    expect(data).toMatch(/\[features\]\s*\nweb_search_request\s*=\s*true/)
+    expect(data).toMatch(/^web_search\s*=\s*"live"/m)
   })
 
-  it('enables reasoning steps in TUI by default', async () => {
+  it('enables raw reasoning output by default (root keys)', async () => {
     await runCommand(root, { rawArgs: ['config', 'init', '--force'] })
     const data = await fs.readFile(CFG, 'utf8')
-    expect(data).toMatch(/\[tui\][\s\S]*show_raw_agent_reasoning\s*=\s*true/)
-    expect(data).toMatch(/\[tui\][\s\S]*hide_agent_reasoning\s*=\s*false/)
+    expect(data).toMatch(/^show_raw_agent_reasoning\s*=\s*true/m)
+    expect(data).toMatch(/^hide_agent_reasoning\s*=\s*false/m)
   })
 })

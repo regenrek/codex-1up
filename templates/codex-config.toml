@@ -1,5 +1,7 @@
 # ~/.codex/config.toml — created by codex-1up
 # Adjust to your liking. See Codex CLI docs for full options.
+#
+# This template is aligned to Codex CLI (codex-rs) v0.88 config keys.
 
 # Core (root defaults)
 model = "gpt-5.2-codex"
@@ -7,33 +9,49 @@ approval_policy = "on-request"       # untrusted|on-failure|on-request|never
 sandbox_mode   = "workspace-write"   # read-only|workspace-write|danger-full-access
 profile = "balanced"                 # active profile: balanced|safe|yolo
 
-# Extra settings that only apply when `sandbox = "workspace-write"`.
+# Web search mode: disabled|cached|live (v0.88+). `live` requires network access
+# when using the workspace-write sandbox.
+web_search = "live"
+
+# Credential storage (recommended: auto)
+cli_auth_credentials_store = "auto"      # auto|file|keyring
+mcp_oauth_credentials_store = "auto"     # auto|file|keyring
+
+# Optional: make citations clickable in your editor.
+# file_opener = "cursor"                 # cursor|vscode|vscode-insiders|windsurf|none
+
+# Reasoning output controls (root keys; default false)
+show_raw_agent_reasoning = true
+hide_agent_reasoning = false
+
+# Extra settings that only apply when `sandbox_mode = "workspace-write"`.
 [sandbox_workspace_write]
 # Allow the command being run inside the sandbox to make outbound network
-# requests. Disabled by default.
+# requests. Disabled by default; enable only if you need live web search or MCP.
 network_access = true
 
 # UI & notifications (can be toggled by installer)
 [tui]
-# Desktop notifications from the TUI: boolean or filtered list. Default: false
+# Desktop notifications from the TUI: boolean or filtered list. Defaults to true in Codex.
 # Examples: true | ["agent-turn-complete", "approval-requested"]
 notifications = false
-# Show raw reasoning content when available (default: false)
-show_raw_agent_reasoning = true
-# Ensure we do not hide internal reasoning (default: false)
-hide_agent_reasoning = false
+# Alternate screen mode: auto|always|never (use "never" for scrollback-friendly terminals)
+alternate_screen = "auto"
 
-# Centralized feature flags — booleans only
+# Tools (not feature flags)
+[tools]
+view_image = true
+
+# Centralized feature flags (booleans only). Prefer leaving these unset unless you
+# know what you're enabling.
 [features]
-web_search_request = true
-unified_exec = false
-streamable_shell = false
-rmcp_client = false
-apply_patch_freeform = false
-view_image_tool = true
-experimental_sandbox_command_assessment = false
-ghost_commit = false
-experimental_windows_sandbox = false
+tui2 = false
+steer = false
+child_agents_md = false
+shell_tool = false
+shell_snapshot = false
+collab = false
+collaboration_modes = false
 
 # ---- Profiles (override only what differs from root) -----------------------
 
@@ -43,8 +61,7 @@ sandbox_mode = "workspace-write"
 model = "gpt-5.2-codex"
 model_reasoning_effort = "medium"
 model_reasoning_summary = "detailed"
-[profiles.balanced.features]
-web_search_request = true
+web_search = "cached"
 
 [profiles.safe]
 approval_policy = "on-failure"
@@ -52,8 +69,7 @@ sandbox_mode = "read-only"
 model = "gpt-5.2-codex"
 model_reasoning_effort = "medium"
 model_reasoning_summary = "detailed"
-[profiles.safe.features]
-web_search_request = false
+web_search = "disabled"
 
 [profiles.yolo]
 approval_policy = "never"
@@ -61,5 +77,4 @@ sandbox_mode = "danger-full-access"
 model = "gpt-5.2-codex"
 model_reasoning_effort = "high"
 model_reasoning_summary = "detailed"
-[profiles.yolo.features]
-web_search_request = true
+web_search = "live"

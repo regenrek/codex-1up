@@ -29,6 +29,83 @@ function listProfilesFromToml(toml: string): string[] {
   return names
 }
 
+function tomlQuoteKeySegment(value: string): string {
+  // Quoted key segments allow slashes/spaces in table names: [projects."/path/to/repo"]
+  return JSON.stringify(value)
+}
+
+function ensureProjectsTrustInline(toml: string, absPath: string, trustLevel: 'trusted'|'untrusted'): string {
+  const tableHeader = `[projects.${tomlQuoteKeySegment(absPath)}]`
+  const lines = toml.split(/\r?\n/)
+
+  // Find (or append) the table.
+  let start = -1
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].trim() === tableHeader) { start = i; break }
+  }
+  if (start === -1) {
+    const trimmed = toml.replace(/\s*$/, '\n')
+    return trimmed + `\n${tableHeader}\ntrust_level = "${trustLevel}"\n`
+  }
+
+  // Replace or insert trust_level inside this table.
+  let i = start + 1
+  for (; i < lines.length; i++) {
+    const ln = lines[i]
+    if (/^\s*\[/.test(ln)) break
+    if (/^\s*trust_level\s*=/.test(ln)) {
+      lines[i] = `trust_level = "${trustLevel}"`
+      return lines.join('\n').replace(/\s*$/, '\n')
+    }
+  }
+  lines.splice(i, 0, `trust_level = "${trustLevel}"`)
+  return lines.join('\n').replace(/\s*$/, '\n')
+}
+
+function ensureMcpServerInline(
+  toml: string,
+  name: string,
+  fields: { command?: string; args?: string[]; url?: string; enabled?: boolean }
+): string {
+  const seg = /^[A-Za-z0-9_-]+$/.test(name) ? name : tomlQuoteKeySegment(name)
+  const tableHeader = `[mcp_servers.${seg}]`
+  const lines = toml.split(/\r?\n/)
+
+  let start = -1
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].trim() === tableHeader) { start = i; break }
+  }
+  if (start === -1) {
+    const parts: string[] = ['', tableHeader]
+    if (fields.command) parts.push(`command = ${JSON.stringify(fields.command)}`)
+    if (fields.args) parts.push(`args = ${JSON.stringify(fields.args)}`)
+    if (fields.url) parts.push(`url = ${JSON.stringify(fields.url)}`)
+    if (typeof fields.enabled === 'boolean') parts.push(`enabled = ${fields.enabled ? 'true' : 'false'}`)
+    return toml.replace(/\s*$/, '\n') + parts.join('\n') + '\n'
+  }
+
+  const setKey = (key: string, rhs: string) => {
+    for (let i = start + 1; i < lines.length; i++) {
+      const ln = lines[i]
+      if (/^\s*\[/.test(ln)) {
+        lines.splice(i, 0, `${key} = ${rhs}`)
+        return
+      }
+      if (new RegExp(`^\\s*${key}\\s*=`).test(ln)) {
+        lines[i] = `${key} = ${rhs}`
+        return
+      }
+    }
+    lines.push(`${key} = ${rhs}`)
+  }
+
+  if (fields.command) setKey('command', JSON.stringify(fields.command))
+  if (fields.args) setKey('args', JSON.stringify(fields.args))
+  if (fields.url) setKey('url', JSON.stringify(fields.url))
+  if (typeof fields.enabled === 'boolean') setKey('enabled', fields.enabled ? 'true' : 'false')
+  return lines.join('\n').replace(/\s*$/, '\n')
+}
+
 export function setRootProfileInline(toml: string, name: string): string {
   const line = `profile = "${name}"`
   if (/^profile\s*=\s*".*"/m.test(toml)) {
@@ -87,6 +164,55 @@ export const configCommand = defineCommand({
         const updated = setRootProfileInline(data, want)
         await writeFile(CFG, updated)
         process.stdout.write(`profile set to ${want}\n`)
+      }
+    })
+    ,
+    trust: defineCommand({
+      meta: { name: 'trust', description: 'Mark a repo path as trusted (projects.<path>.trust_level)' },
+      args: {
+        path: { type: 'string', description: 'Path to trust (default: PWD)' }
+      },
+      async run({ args }) {
+        const { CFG } = getPaths()
+        const raw = await readFile(CFG)
+        const abs = resolve(String(args.path || process.cwd()))
+        const updated = ensureProjectsTrustInline(raw, abs, 'trusted')
+        await writeFile(CFG, updated)
+        process.stdout.write(`trusted: ${abs}\n`)
+      }
+    }),
+    mcp: defineCommand({
+      meta: { name: 'mcp', description: 'Manage [mcp_servers] entries in config.toml' },
+      subCommands: {
+        set: defineCommand({
+          meta: { name: 'set', description: 'Add/update an MCP server entry' },
+          args: {
+            name: { type: 'positional', required: true, description: 'Server name (table key)' },
+            command: { type: 'string', description: 'Command to run (e.g. "node")' },
+            args: { type: 'string', description: 'Comma-separated args (e.g. "server.js,--flag")' },
+            url: { type: 'string', description: 'HTTP URL (for remote MCP)' },
+            enabled: { type: 'string', description: 'true|false (optional)' }
+          },
+          async run({ args }) {
+            const { CFG } = getPaths()
+            const raw = await readFile(CFG)
+            const name = String(args.name)
+            const argv = typeof args.args === 'undefined'
+              ? undefined
+              : String(args.args).split(',').map(s => s.trim()).filter(Boolean)
+            const enabled = typeof args.enabled === 'undefined'
+              ? undefined
+              : String(args.enabled).trim().toLowerCase() === 'true'
+            const updated = ensureMcpServerInline(raw, name, {
+              command: typeof args.command === 'undefined' ? undefined : String(args.command),
+              args: argv,
+              url: typeof args.url === 'undefined' ? undefined : String(args.url),
+              enabled: typeof args.enabled === 'undefined' ? undefined : enabled
+            })
+            await writeFile(CFG, updated)
+            process.stdout.write(`mcp server updated: ${name}\n`)
+          }
+        })
       }
     })
   }

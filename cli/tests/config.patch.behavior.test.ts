@@ -66,7 +66,7 @@ describe('writeCodexConfig targeted patches', () => {
     expect(data).toMatch(/\[profiles\.balanced\][\s\S]*model\s*=\s*"gpt-5.2-codex"/)
     expect(data).toMatch(/\[profiles\.balanced\][\s\S]*model_reasoning_effort\s*=\s*"medium"/)
     expect(data).toMatch(/\[profiles\.balanced\][\s\S]*model_reasoning_summary\s*=\s*"detailed"/)
-    expect(data).toMatch(/\[profiles\.balanced\.features\][\s\S]*web_search_request\s*=\s*true/)
+    expect(data).toMatch(/\[profiles\.balanced\][\s\S]*web_search\s*=\s*"cached"/)
     await cleanup()
   })
 
@@ -82,7 +82,7 @@ describe('writeCodexConfig targeted patches', () => {
     expect(data).toMatch(/\[profiles\.safe\][\s\S]*model_reasoning_effort\s*=\s*"medium"/)
     expect(data).toMatch(/\[profiles\.safe\][\s\S]*model_reasoning_summary\s*=\s*"detailed"/)
     expect(data).not.toMatch(/\[profiles\.safe\][\s\S]*extra_key/)
-    expect(data).toMatch(/\[profiles\.safe\.features\][\s\S]*web_search_request\s*=\s*false/)
+    expect(data).toMatch(/\[profiles\.safe\][\s\S]*web_search\s*=\s*"disabled"/)
     await cleanup()
   })
 
@@ -154,24 +154,24 @@ describe('writeCodexConfig targeted patches', () => {
     await cleanup()
   })
 
-  it('migrates experimental_use_exec_command_tool to [features].streamable_shell', async () => {
+  it('migrates experimental_use_exec_command_tool to [features].shell_tool', async () => {
     const initial = `experimental_use_exec_command_tool = true\n`
     const { ctx, cfgPath, cleanup } = await setupContext(initial)
     ctx.options.profile = 'skip'
     await writeCodexConfig(ctx)
     const data = await fs.readFile(cfgPath, 'utf8')
-    expect(data).toMatch(/\[features\][\s\S]*streamable_shell\s*=\s*true/)
+    expect(data).toMatch(/\[features\][\s\S]*shell_tool\s*=\s*true/)
     expect(data).not.toMatch(/experimental_use_exec_command_tool/)
     await cleanup()
   })
 
-  it('drops experimental_use_exec_command_tool if streamable_shell is already set', async () => {
-    const initial = `experimental_use_exec_command_tool = true\n[features]\nstreamable_shell = false\n`
+  it('drops experimental_use_exec_command_tool if shell_tool is already set', async () => {
+    const initial = `experimental_use_exec_command_tool = true\n[features]\nshell_tool = false\n`
     const { ctx, cfgPath, cleanup } = await setupContext(initial)
     ctx.options.profile = 'skip'
     await writeCodexConfig(ctx)
     const data = await fs.readFile(cfgPath, 'utf8')
-    expect(data).toMatch(/\[features\][\s\S]*streamable_shell\s*=\s*false/)
+    expect(data).toMatch(/\[features\][\s\S]*shell_tool\s*=\s*false/)
     expect(data).not.toMatch(/experimental_use_exec_command_tool/)
     await cleanup()
   })
@@ -180,6 +180,7 @@ describe('writeCodexConfig targeted patches', () => {
     const initial = [
       'experimental_use_unified_exec_tool = true',
       'include_apply_patch_tool = true',
+      'experimental_use_freeform_apply_patch = true',
       'experimental_use_rmcp_client = false',
       '',
       '[features]',
@@ -193,9 +194,11 @@ describe('writeCodexConfig targeted patches', () => {
     expect(data).toMatch(/\[features\][\s\S]*web_search_request\s*=\s*true/)
     expect(data).toMatch(/\[features\][\s\S]*unified_exec\s*=\s*true/)
     expect(data).toMatch(/\[features\][\s\S]*apply_patch_freeform\s*=\s*true/)
-    expect(data).toMatch(/\[features\][\s\S]*rmcp_client\s*=\s*false/)
+    expect(data).toMatch(/\[features\][\s\S]*include_apply_patch_tool\s*=\s*true/)
     expect(data).not.toMatch(/experimental_use_unified_exec_tool/)
-    expect(data).not.toMatch(/include_apply_patch_tool/)
+    // Root-level deprecated key removed; feature key remains.
+    const prefix = data.split('[features]')[0] || ''
+    expect(prefix).not.toMatch(/^include_apply_patch_tool\s*=/m)
     expect(data).not.toMatch(/experimental_use_rmcp_client/)
     await cleanup()
   })

@@ -7,7 +7,15 @@ import * as p from '@clack/prompts'
 import { runInstall, printPostInstallSummary } from '../actions/install.js'
 import { listBundledSkills } from '../actions/skills.js'
 import { isToolId, listToolDefinitions } from '../actions/tools.js'
-import type { InstallerOptions, ToolId } from '../installers/types.js'
+import type {
+  CredentialsStoreChoice,
+  ExperimentalFeature,
+  FileOpenerChoice,
+  InstallerOptions,
+  ToolId,
+  TuiAltScreenChoice,
+  WebSearchChoice
+} from '../installers/types.js'
 import { findRepoRoot } from '../lib/repoRoot.js'
 import { PACKAGE_VERSION } from '../lib/package.js'
 import { runInstallWizard } from '../flows/installWizard.js'
@@ -33,6 +41,12 @@ export const installCommand = defineCommand({
     'profiles-scope': { type: 'string', description: 'single|all (write one profile or all profiles)' },
     profile: { type: 'string', description: 'balanced|safe|yolo|skip (choose profile to write)' },
     'profile-mode': { type: 'string', description: 'add|overwrite (profile table merge strategy)' },
+    'web-search': { type: 'string', description: 'disabled|cached|live|skip (override web search mode in selected profiles)' },
+    'file-opener': { type: 'string', description: 'cursor|vscode|vscode-insiders|windsurf|none|skip (open citations in editor)' },
+    'credentials-store': { type: 'string', description: 'auto|file|keyring|skip (set cli_auth_credentials_store + mcp_oauth_credentials_store)' },
+    tui2: { type: 'boolean', description: 'Enable Codex TUI2 (experimental)' },
+    'alt-screen': { type: 'string', description: 'auto|always|never|skip (set tui.alternate_screen)' },
+    experimental: { type: 'string', description: 'comma-separated experimental feature toggles: background-terminal, steering, multi-agent, collaboration-modes' },
     sound: { type: 'string', description: 'Sound file, "none", or "skip" to leave unchanged' },
     'agents-md': { type: 'string', description: 'Write starter AGENTS.md to PATH (default PWD/AGENTS.md)', required: false },
     skills: { type: 'string', description: 'Install bundled Agent Skills to ~/.codex/skills: all|skip|<comma-separated names>' }
@@ -59,6 +73,24 @@ export const installCommand = defineCommand({
     const cliToolsArg = typeof args.tools === 'undefined'
       ? undefined
       : String(args.tools).trim()
+    const cliWebSearchArg = typeof args['web-search'] === 'undefined'
+      ? undefined
+      : String(args['web-search']).trim()
+    const cliFileOpenerArg = typeof args['file-opener'] === 'undefined'
+      ? undefined
+      : String(args['file-opener']).trim()
+    const cliCredentialsStoreArg = typeof args['credentials-store'] === 'undefined'
+      ? undefined
+      : String(args['credentials-store']).trim()
+    const cliTui2Arg = typeof args.tui2 === 'undefined'
+      ? undefined
+      : Boolean(args.tui2)
+    const cliAltScreenArg = typeof args['alt-screen'] === 'undefined'
+      ? undefined
+      : String(args['alt-screen']).trim()
+    const cliExperimentalArg = typeof args.experimental === 'undefined'
+      ? undefined
+      : String(args.experimental).trim()
     const argsRecord = args as Record<string, unknown>
     const cliSkillsArg = typeof argsRecord.skills === 'undefined'
       ? undefined
@@ -67,6 +99,11 @@ export const installCommand = defineCommand({
     if (cliSoundArg === '') throw new Error('Invalid --sound value (expected path, "none", or "skip")')
     if (cliToolsArg === '') throw new Error('Invalid --tools value (expected all|skip|<comma-separated tool ids>)')
     if (cliSkillsArg === '') throw new Error('Invalid --skills value (expected all|skip|<comma-separated skill names>)')
+    if (cliWebSearchArg === '') throw new Error('Invalid --web-search value (expected disabled|cached|live|skip)')
+    if (cliFileOpenerArg === '') throw new Error('Invalid --file-opener value (expected cursor|vscode|vscode-insiders|windsurf|none|skip)')
+    if (cliCredentialsStoreArg === '') throw new Error('Invalid --credentials-store value (expected auto|file|keyring|skip)')
+    if (cliAltScreenArg === '') throw new Error('Invalid --alt-screen value (expected auto|always|never|skip)')
+    if (cliExperimentalArg === '') throw new Error('Invalid --experimental value (expected comma-separated list)')
 
     const hasNoVscodeFlag = rawArgs.some(arg => arg === '--no-vscode' || arg.startsWith('--no-vscode='))
 
@@ -93,6 +130,12 @@ export const installCommand = defineCommand({
     let skillsMode: 'skip'|'all'|'select' = 'skip'
     let skillsSelected: string[] | undefined
     let toolsSelected: ToolId[] | undefined
+    let webSearch: WebSearchChoice | undefined
+    let fileOpener: FileOpenerChoice | undefined
+    let credentialsStore: CredentialsStoreChoice | undefined
+    let enableTui2: boolean = false
+    let tuiAlternateScreen: TuiAltScreenChoice | undefined
+    let experimentalFeatures: ExperimentalFeature[] | undefined
 
     const applySoundSelection = (choice: string) => {
       const normalized = choice.trim().toLowerCase()
@@ -125,6 +168,23 @@ export const installCommand = defineCommand({
         skillsMode = 'select'
         skillsSelected = parts
       }
+    }
+
+    if (cliWebSearchArg) {
+      webSearch = normalizeWebSearchArg(cliWebSearchArg)
+    }
+    if (cliFileOpenerArg) {
+      fileOpener = normalizeFileOpenerArg(cliFileOpenerArg)
+    }
+    if (cliCredentialsStoreArg) {
+      credentialsStore = normalizeCredentialsStoreArg(cliCredentialsStoreArg)
+    }
+    enableTui2 = Boolean(cliTui2Arg || false)
+    if (cliAltScreenArg) {
+      tuiAlternateScreen = normalizeAltScreenArg(cliAltScreenArg)
+    }
+    if (cliExperimentalArg) {
+      experimentalFeatures = parseExperimentalArg(cliExperimentalArg)
     }
 
     if (cliToolsArg) {
@@ -165,7 +225,13 @@ export const installCommand = defineCommand({
           profileScope: cliProfileScope,
           soundArg: cliSoundArg,
           toolsArg: cliToolsArg,
-          skillsArg: cliSkillsArg
+          skillsArg: cliSkillsArg,
+          webSearchArg: cliWebSearchArg,
+          fileOpenerArg: cliFileOpenerArg,
+          credentialsStoreArg: cliCredentialsStoreArg,
+          tui2Arg: cliTui2Arg,
+          altScreenArg: cliAltScreenArg,
+          experimentalArg: cliExperimentalArg
         },
         selections: {
           profileChoice,
@@ -180,7 +246,13 @@ export const installCommand = defineCommand({
           globalAgentsAction,
           notificationSound,
           skillsMode,
-          skillsSelected
+          skillsSelected,
+          webSearch,
+          fileOpener,
+          credentialsStore,
+          enableTui2,
+          tuiAlternateScreen,
+          experimentalFeatures
         }
       })
       if (!wizardResult) return
@@ -197,7 +269,13 @@ export const installCommand = defineCommand({
         globalAgentsAction,
         notificationSound,
         skillsMode,
-        skillsSelected
+        skillsSelected,
+        webSearch,
+        fileOpener,
+        credentialsStore,
+        enableTui2,
+        tuiAlternateScreen,
+        experimentalFeatures
       } = wizardResult.selections)
     }
 
@@ -237,6 +315,12 @@ export const installCommand = defineCommand({
       notificationSound,
       skills: skillsMode,
       skillsSelected,
+      webSearch,
+      fileOpener,
+      credentialsStore,
+      enableTui2,
+      tuiAlternateScreen,
+      experimentalFeatures,
       mode: 'manual',
       installNode: (args['install-node'] as 'nvm'|'brew'|'skip') || 'skip',
       shell: String(args.shell || 'auto'),
@@ -309,6 +393,60 @@ function normalizeYesNoArg(value: unknown): ('yes'|'no') | undefined {
   const normalized = String(value).toLowerCase()
   if (normalized === 'yes' || normalized === 'no') return normalized
   throw new Error('Expected yes|no')
+}
+
+function normalizeWebSearchArg(value: string): WebSearchChoice {
+  const normalized = String(value).trim().toLowerCase()
+  if (normalized === 'skip') return 'skip'
+  if (normalized === 'disabled' || normalized === 'cached' || normalized === 'live') return normalized
+  throw new Error('Invalid --web-search value (use disabled|cached|live|skip).')
+}
+
+function normalizeFileOpenerArg(value: string): FileOpenerChoice {
+  const normalized = String(value).trim().toLowerCase()
+  if (normalized === 'skip') return 'skip'
+  if (normalized === 'none') return 'none'
+  if (normalized === 'cursor' || normalized === 'vscode' || normalized === 'vscode-insiders' || normalized === 'windsurf') {
+    return normalized
+  }
+  throw new Error('Invalid --file-opener value (use cursor|vscode|vscode-insiders|windsurf|none|skip).')
+}
+
+function normalizeCredentialsStoreArg(value: string): CredentialsStoreChoice {
+  const normalized = String(value).trim().toLowerCase()
+  if (normalized === 'skip') return 'skip'
+  if (normalized === 'auto' || normalized === 'file' || normalized === 'keyring') return normalized
+  throw new Error('Invalid --credentials-store value (use auto|file|keyring|skip).')
+}
+
+function normalizeAltScreenArg(value: string): TuiAltScreenChoice {
+  const normalized = String(value).trim().toLowerCase()
+  if (normalized === 'skip') return 'skip'
+  if (normalized === 'auto' || normalized === 'always' || normalized === 'never') return normalized
+  throw new Error('Invalid --alt-screen value (use auto|always|never|skip).')
+}
+
+function parseExperimentalArg(value: string): ExperimentalFeature[] {
+  const parts = String(value)
+    .split(',')
+    .map(s => s.trim().toLowerCase())
+    .filter(Boolean)
+  const out: ExperimentalFeature[] = []
+  for (const p of parts) {
+    if (
+      p === 'background-terminal' ||
+      p === 'shell-snapshot' ||
+      p === 'multi-agents' ||
+      p === 'steering' ||
+      p === 'collaboration-modes' ||
+      p === 'child-agent-project-docs'
+    ) {
+      if (!out.includes(p)) out.push(p)
+      continue
+    }
+    throw new Error(`Unknown --experimental feature: ${p}`)
+  }
+  return out
 }
 
 function isProfile(value: unknown): value is 'balanced'|'safe'|'yolo' {
