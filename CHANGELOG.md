@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.3.14] - 2026-01-22
+
+### Added
+- Installer: new flags and wizard prompts for Codex v0.88 config options:
+  - `--web-search` (disabled|cached|live|skip)
+  - `--file-opener` (cursor|vscode|vscode-insiders|windsurf|none|skip)
+  - `--credentials-store` (auto|file|keyring|skip)
+  - `--tui2` and `--alt-screen` (auto|always|never|skip)
+  - `--experimental` (background-terminal, shell-snapshot, multi-agents, steering, collaboration-modes, child-agent-project-docs)
+- Config: `codex-1up config trust --path <dir>` to mark a repo as trusted in `~/.codex/config.toml`.
+- Config: `codex-1up config mcp set <name> ...` helper to add/update `[mcp_servers]` entries safely.
+- Skills: when installing bundled skills, write `[[skills.config]]` entries to `~/.codex/config.toml` for discoverable enable/disable.
+- Tests: validate `templates/codex-config.toml` keys against the upstream v0.88 schema whitelist to prevent drift.
+
+### Changed
+- Template defaults: set `web_search = "live"` by default and enable `sandbox_workspace_write.network_access = true` for web search compatibility.
+
+### Fixed
+- Template: fix `model_reasoning_summary` key typo and align reasoning visibility keys with upstream placement.
+
+### Tests
+- Increased overall test coverage to **>80%** to meet the release bar.
+
 ## [0.3.13] - 2026-01-21
 
 ### Fixed

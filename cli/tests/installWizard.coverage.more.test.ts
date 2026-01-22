@@ -257,5 +257,194 @@ describe('runInstallWizard (extra coverage)', () => {
 
     await fs.rm(input.repoRoot, { recursive: true, force: true })
   })
+
+  it('covers Codex CLI install/update decision branches', async () => {
+    const input = await makeInput()
+
+    // Force tools prompt to be skipped for deterministic prompt ordering.
+    input.cliArgs.toolsArg = 'skip'
+
+    const codex = await import('../src/actions/codex.js')
+    const getCodexStatus = codex.getCodexStatus as unknown as ReturnType<typeof vi.fn>
+
+    // First run: Codex not detected -> prompt install -> user says no.
+    getCodexStatus.mockResolvedValueOnce({ found: false })
+    promptState.confirms.push((msg) => (msg.includes('Codex CLI not found. Install now?') ? false : true))
+
+    // Profiles: skip any profile changes
+    promptState.selects.push((msg) => (msg.includes('Install all profiles') ? 'skip' : undefined))
+    // Sound: skip
+    promptState.selects.push((msg) => (msg === 'Notification sound' ? 'skip' : undefined))
+    // Global agents: skip
+    promptState.selects.push((msg) => (msg.includes('Global ~/.codex/AGENTS.md') ? 'skip' : undefined))
+
+    const { runInstallWizard } = await import('../src/flows/installWizard.js')
+    const res1 = await runInstallWizard(input as any)
+    expect(res1).not.toBeNull()
+
+    // Second run: Codex detected but update available -> prompt update -> user says no.
+    getCodexStatus.mockResolvedValueOnce({ found: true, version: '0.1.0', latest: '0.2.0', updateAvailable: true })
+    promptState.confirms.push((msg) => (msg.includes('Update now?') ? false : true))
+
+    promptState.selects.push((msg) => (msg.includes('Install all profiles') ? 'skip' : undefined))
+    promptState.selects.push((msg) => (msg === 'Notification sound' ? 'skip' : undefined))
+    promptState.selects.push((msg) => (msg.includes('Global ~/.codex/AGENTS.md') ? 'skip' : undefined))
+
+    const res2 = await runInstallWizard(input as any)
+    expect(res2).not.toBeNull()
+
+    await fs.rm(input.repoRoot, { recursive: true, force: true })
+  })
+
+  it('covers advanced prompts selections (web search, opener, creds, tui2, alt-screen, experimental)', async () => {
+    const input = await makeInput()
+    input.cliArgs.toolsArg = 'skip'
+
+    // Profiles scope: choose "selected" and pick yolo only.
+    promptState.selects.push(() => 'selected')
+    promptState.multiselects.push(() => ['yolo'])
+
+    // Profile write mode (single selected profile -> profiles.yolo message)
+    promptState.selects.push(() => 'overwrite')
+
+    // Advanced prompts (order matters)
+    promptState.selects.push(() => 'live')    // web search
+    promptState.selects.push(() => 'cursor')  // file opener
+    promptState.selects.push(() => 'auto')    // credential store
+    promptState.confirms.push(() => true)     // enable TUI2
+    promptState.selects.push(() => 'never')   // alternate screen
+    promptState.multiselects.push(() => ['collaboration-modes', 'multi-agents'])
+
+    // Default profile confirm (single selected profile)
+    promptState.confirms.push(() => true)
+
+    // Sound: skip
+    promptState.selects.push(() => 'skip')
+
+    // Global agents: skip
+    promptState.selects.push(() => 'skip')
+
+    // Skills: skip
+    promptState.selects.push(() => 'skip')
+
+    const { runInstallWizard } = await import('../src/flows/installWizard.js')
+    const res = await runInstallWizard(input as any)
+    expect(res).not.toBeNull()
+    expect(res!.selections.webSearch).toBe('live')
+    expect(res!.selections.fileOpener).toBe('cursor')
+    expect(res!.selections.credentialsStore).toBe('auto')
+    expect(res!.selections.enableTui2).toBe(true)
+    expect(res!.selections.tuiAlternateScreen).toBe('never')
+    expect(res!.selections.experimentalFeatures).toEqual(['collaboration-modes', 'multi-agents'])
+
+    await fs.rm(input.repoRoot, { recursive: true, force: true })
+  })
+
+  it('covers multi-profile default selection (skip keeping current default)', async () => {
+    const input = await makeInput()
+    input.cliArgs.toolsArg = 'skip'
+
+    // Skip advanced prompts to keep ordering simple.
+    input.cliArgs.webSearchArg = 'skip'
+    input.cliArgs.fileOpenerArg = 'skip'
+    input.cliArgs.credentialsStoreArg = 'skip'
+    input.cliArgs.tui2Arg = false
+    input.cliArgs.altScreenArg = 'skip'
+    input.cliArgs.experimentalArg = 'skip'
+
+    // Profiles scope: choose selected and pick two profiles.
+    promptState.selects.push(() => 'selected')
+    promptState.multiselects.push(() => ['balanced', 'safe'])
+    // Mode prompt for selected profiles (>1)
+    promptState.selects.push(() => 'add')
+    // Default profile selection prompt (multi-profile branch) -> skip
+    promptState.selects.push(() => 'skip')
+
+    // Sound: skip
+    promptState.selects.push(() => 'skip')
+    // Global agents: skip
+    promptState.selects.push(() => 'skip')
+    // Skills: skip
+    promptState.selects.push(() => 'skip')
+
+    const { runInstallWizard } = await import('../src/flows/installWizard.js')
+    const res = await runInstallWizard(input as any)
+    expect(res).not.toBeNull()
+    expect(res!.selections.setDefaultProfile).toBe(false)
+
+    await fs.rm(input.repoRoot, { recursive: true, force: true })
+  })
+
+  it('covers non-unixlike tools path (forces installTools=skip)', async () => {
+    const input = await makeInput()
+    input.isUnixLike = false
+
+    // Profiles: don't install any profiles to keep ordering small.
+    promptState.selects.push(() => 'skip')
+    // Sound: skip
+    promptState.selects.push(() => 'skip')
+    // Global agents: skip
+    promptState.selects.push(() => 'skip')
+
+    const { runInstallWizard } = await import('../src/flows/installWizard.js')
+    const res = await runInstallWizard(input as any)
+    expect(res).not.toBeNull()
+    expect(res!.selections.installTools).toBe('skip')
+
+    await fs.rm(input.repoRoot, { recursive: true, force: true })
+  })
+
+  it('covers global AGENTS create path and skills=all', async () => {
+    const input = await makeInput()
+    input.cliArgs.toolsArg = 'skip'
+    input.globalAgentsExists = false
+    input.cliArgs.fileOpenerArg = 'skip'
+    input.cliArgs.credentialsStoreArg = 'skip'
+    input.cliArgs.tui2Arg = false
+    input.cliArgs.altScreenArg = 'skip'
+    input.cliArgs.experimentalArg = 'skip'
+
+    // Profiles: skip all
+    promptState.selects.push(() => 'skip')
+    // Sound: skip
+    promptState.selects.push(() => 'skip')
+    // Global agents: create starter
+    promptState.selects.push(() => 'create-default')
+    // Skills: all
+    promptState.selects.push(() => 'all')
+
+    const { runInstallWizard } = await import('../src/flows/installWizard.js')
+    const res = await runInstallWizard(input as any)
+    expect(res).not.toBeNull()
+    expect(res!.selections.globalAgentsAction).toBe('create-default')
+    expect(res!.selections.skillsMode).toBe('all')
+
+    await fs.rm(input.repoRoot, { recursive: true, force: true })
+  })
+
+  it('covers global AGENTS append path and skills select empty => skip', async () => {
+    const input = await makeInput()
+    input.cliArgs.toolsArg = 'skip'
+    input.globalAgentsExists = true
+
+    // Profiles: skip all
+    promptState.selects.push(() => 'skip')
+    // Sound: skip
+    promptState.selects.push(() => 'skip')
+    // Global agents: append
+    promptState.selects.push(() => 'append-default')
+    // Skills: select, then choose nothing
+    promptState.selects.push(() => 'select')
+    promptState.multiselects.push(() => [])
+
+    const { runInstallWizard } = await import('../src/flows/installWizard.js')
+    const res = await runInstallWizard(input as any)
+    expect(res).not.toBeNull()
+    expect(res!.selections.globalAgentsAction).toBe('append-default')
+    expect(res!.selections.skillsMode).toBe('skip')
+    expect(res!.selections.skillsSelected).toBeUndefined()
+
+    await fs.rm(input.repoRoot, { recursive: true, force: true })
+  })
 })
 

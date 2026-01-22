@@ -111,4 +111,58 @@ describe('install args mapping', () => {
     expect(opts.installTools).toBe('select')
     expect(opts.toolsSelected).toEqual(['rg', 'fd'])
   })
+
+  it('maps v0.88 config flags (web search, opener, credential store, tui)', async () => {
+    Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true })
+    await runCommand(installCommand, { rawArgs: buildRawArgsFromFlags({
+      yes: true,
+      'skip-confirmation': true,
+      'dry-run': true,
+      profile: 'yolo',
+      'profiles-scope': 'single',
+      'profile-mode': 'add',
+      'web-search': 'live',
+      'file-opener': 'cursor',
+      'credentials-store': 'auto',
+      tui2: true,
+      'alt-screen': 'never'
+    }) })
+    const opts = captured.pop()
+    expect(opts.webSearch).toBe('live')
+    expect(opts.fileOpener).toBe('cursor')
+    expect(opts.credentialsStore).toBe('auto')
+    expect(opts.enableTui2).toBe(true)
+    expect(opts.tuiAlternateScreen).toBe('never')
+  })
+
+  it('maps experimental feature list', async () => {
+    Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true })
+    await runCommand(installCommand, { rawArgs: buildRawArgsFromFlags({
+      yes: true,
+      'skip-confirmation': true,
+      'dry-run': true,
+      experimental: 'background-terminal,shell-snapshot,multi-agents,steering,collaboration-modes,child-agent-project-docs'
+    }) })
+    const opts = captured.pop()
+    expect(opts.experimentalFeatures).toEqual([
+      'background-terminal',
+      'shell-snapshot',
+      'multi-agents',
+      'steering',
+      'collaboration-modes',
+      'child-agent-project-docs'
+    ])
+  })
+
+  it('rejects unknown experimental feature', async () => {
+    Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true })
+    await expect(
+      runCommand(installCommand, { rawArgs: buildRawArgsFromFlags({
+        yes: true,
+        'skip-confirmation': true,
+        'dry-run': true,
+        experimental: 'nope'
+      }) })
+    ).rejects.toThrow(/Unknown --experimental feature/i)
+  })
 })
