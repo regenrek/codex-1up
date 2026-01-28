@@ -59,9 +59,13 @@ export async function runInstaller(options: InstallerOptions, rootDir: string): 
     }
 
     if (configWritable) {
-      // Detect installed codex version once, so we can safely gate config keys.
-      const installed = await getInstalledCodexVersion()
-      ctx.codexVersion = installed.version
+      // Detect installed codex version only when needed for config gating.
+      // This avoids potentially slow/fragile version probes in environments where `needCmd('codex')`
+      // is mocked (tests) or where `codex --version` may be slow to spawn.
+      if (ctx.options.suppressUnstableWarning === true) {
+        const installed = await getInstalledCodexVersion()
+        ctx.codexVersion = installed.version
+      }
 
       await writeCodexConfig(ctx)
       await ensureNotifyHook(ctx)
