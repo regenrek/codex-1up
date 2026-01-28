@@ -76,6 +76,7 @@ export async function writeCodexConfig(ctx: InstallerContext): Promise<void> {
   touched = applyCredentialsStore(editor, ctx) || touched
   touched = applyTuiAlternateScreen(editor, ctx) || touched
   touched = applyExperimentalFeatureToggles(editor, ctx) || touched
+  touched = applySuppressUnstableFeaturesWarning(editor, ctx) || touched
   touched = normalizeReasoningSummaryForCodexModels(editor) || touched
 
   if (!touched) {
@@ -236,6 +237,10 @@ function applyExperimentalFeatureToggles(editor: TomlEditor, ctx: InstallerConte
       flags.push({ key: 'collaboration_modes', enabled: true })
     } else if (f === 'child-agent-project-docs') {
       flags.push({ key: 'child_agents_md', enabled: true })
+    } else if (f === 'connectors') {
+      flags.push({ key: 'connectors', enabled: true })
+    } else if (f === 'responses-websockets') {
+      flags.push({ key: 'responses_websockets', enabled: true })
     }
   }
 
@@ -250,6 +255,34 @@ function applyExperimentalFeatureToggles(editor: TomlEditor, ctx: InstallerConte
     }
   }
   return changed
+}
+
+function applySuppressUnstableFeaturesWarning(editor: TomlEditor, ctx: InstallerContext): boolean {
+  const choice = ctx.options.suppressUnstableWarning
+  if (!choice || choice === 'skip') return false
+
+  // Only write this key if Codex is new enough to understand it (or if the user already has it).
+  const existing = editor.getRootValue('suppress_unstable_features_warning')
+  const allow =
+    Boolean(existing) ||
+    (ctx.codexVersion ? isCodexAtLeast(ctx.codexVersion, '0.92.0') : false)
+  if (!allow) return false
+
+  return editor.setRootKey('suppress_unstable_features_warning', String(choice), { mode: 'force' })
+}
+
+function isCodexAtLeast(current: string, minimum: string): boolean {
+  // Intentionally ignore prerelease/build metadata (e.g. 0.92.0-alpha.11 => 0.92.0).
+  const parse = (v: string): [number, number, number] => {
+    const core = v.split(/[+-]/)[0] || v
+    const parts = core.split('.').map(s => Number(s))
+    return [parts[0] || 0, parts[1] || 0, parts[2] || 0]
+  }
+  const [a1, a2, a3] = parse(current)
+  const [b1, b2, b3] = parse(minimum)
+  if (a1 !== b1) return a1 > b1
+  if (a2 !== b2) return a2 > b2
+  return a3 >= b3
 }
 
 function resolveProfileTargets(

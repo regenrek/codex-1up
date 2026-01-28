@@ -1,7 +1,7 @@
 # ~/.codex/config.toml — created by codex-1up
 # Adjust to your liking. See Codex CLI docs for full options.
 #
-# This template is aligned to Codex CLI (codex-rs) v0.88 config keys.
+# This template is aligned to Codex CLI (codex-rs) v0.92 config keys.
 
 # Core (root defaults)
 model = "gpt-5.2-codex"
@@ -19,6 +19,12 @@ mcp_oauth_credentials_store = "auto"     # auto|file|keyring
 
 # Optional: make citations clickable in your editor.
 # file_opener = "cursor"                 # cursor|vscode|vscode-insiders|windsurf|none
+
+# Optional: model personality (only supported by some models, e.g. gpt-5.2-codex).
+# model_personality = "friendly"         # friendly|pragmatic
+#
+# If personalities ever look “stuck” or “not applying”, try clearing the remote models cache:
+#   rm -f ~/.codex/models_cache.json
 
 # Reasoning output controls (root keys; default false)
 show_raw_agent_reasoning = true
@@ -51,6 +57,12 @@ shell_tool = false
 shell_snapshot = false
 collab = false
 collaboration_modes = false
+connectors = false
+responses_websockets = false
+
+# Optional: hide the “Under-development features enabled …” startup warning.
+# This does NOT make under-development features stable; it only suppresses the reminder.
+# suppress_unstable_features_warning = true
 
 # ---- Profiles (override only what differs from root) -----------------------
 

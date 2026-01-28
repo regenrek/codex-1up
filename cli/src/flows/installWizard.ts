@@ -42,6 +42,7 @@ export interface InstallSelections {
   credentialsStore?: CredentialsStoreChoice | undefined
   tuiAlternateScreen?: TuiAltScreenChoice | undefined
   experimentalFeatures?: ExperimentalFeature[] | undefined
+  suppressUnstableWarning?: boolean | undefined
 }
 
 export interface InstallWizardInput {
@@ -104,7 +105,8 @@ export async function runInstallWizard(input: InstallWizardInput): Promise<Insta
     fileOpener,
     credentialsStore,
     tuiAlternateScreen,
-    experimentalFeatures
+    experimentalFeatures,
+    suppressUnstableWarning
   } = input.selections
 
   const wizardLogger = {
@@ -421,7 +423,9 @@ export async function runInstallWizard(input: InstallWizardInput): Promise<Insta
         { label: 'Multi-agents (spawn other agents)', value: 'multi-agents' },
         { label: 'Steer conversation', value: 'steering' },
         { label: 'Collaboration modes (Plan/Pair/Execute)', value: 'collaboration-modes' },
-        { label: 'Child-agent project docs (extra AGENTS.md guidance)', value: 'child-agent-project-docs' }
+        { label: 'Child-agent project docs (extra AGENTS.md guidance)', value: 'child-agent-project-docs' },
+        { label: 'Connectors (apps integration)', value: 'connectors' },
+        { label: 'Responses WebSockets transport', value: 'responses-websockets' }
       ]
     })
     if (picked === 'back') {
@@ -429,6 +433,22 @@ export async function runInstallWizard(input: InstallWizardInput): Promise<Insta
     } else {
       const chosen = Array.isArray(picked) ? picked.map(s => String(s).trim()).filter(Boolean) : []
       experimentalFeatures = chosen.filter(isExperimentalFeature)
+    }
+  }
+
+  // If the user enabled under-development features, offer to suppress the startup warning.
+  // This does NOT make the features stable; it only hides the reminder.
+  if (typeof suppressUnstableWarning === 'undefined') {
+    const underDevSelected = (experimentalFeatures || []).some(f =>
+      f === 'multi-agents' || f === 'connectors' || f === 'responses-websockets'
+    )
+    if (underDevSelected) {
+      const suppress = await p.confirm({
+        message: 'Suppress "Under-development features" warning at startup? (Hides the reminder; features may still be unstable.)',
+        initialValue: true
+      })
+      if (p.isCancel(suppress)) return cancelWizard()
+      suppressUnstableWarning = Boolean(suppress)
     }
   }
 
@@ -650,7 +670,8 @@ export async function runInstallWizard(input: InstallWizardInput): Promise<Insta
       fileOpener,
       credentialsStore,
       tuiAlternateScreen,
-      experimentalFeatures
+      experimentalFeatures,
+      suppressUnstableWarning
     }
   }
 }
@@ -734,7 +755,9 @@ function isExperimentalFeature(value: string): value is ExperimentalFeature {
     value === 'multi-agents' ||
     value === 'steering' ||
     value === 'collaboration-modes' ||
-    value === 'child-agent-project-docs'
+    value === 'child-agent-project-docs' ||
+    value === 'connectors' ||
+    value === 'responses-websockets'
 }
 
 function cancelWizard(): null {

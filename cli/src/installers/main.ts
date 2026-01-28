@@ -13,6 +13,7 @@ import { maybePromptGlobalAgents } from './maybePromptGlobalAgents.js'
 import { maybeInstallVscodeExt } from './maybeInstallVscodeExt.js'
 import { maybeWriteAgents } from './maybeWriteAgents.js'
 import { maybeInstallSkills } from './maybeInstallSkills.js'
+import { getInstalledCodexVersion } from './codexStatus.js'
 import { needCmd } from './utils.js'
 
 const PROJECT = 'codex-1up'
@@ -41,6 +42,7 @@ export async function runInstaller(options: InstallerOptions, rootDir: string): 
     rootDir,
     logDir,
     logFile,
+    codexVersion: undefined,
     options,
     logger
   }
@@ -57,6 +59,14 @@ export async function runInstaller(options: InstallerOptions, rootDir: string): 
     }
 
     if (configWritable) {
+      // Detect installed codex version only when needed for config gating.
+      // This avoids potentially slow/fragile version probes in environments where `needCmd('codex')`
+      // is mocked (tests) or where `codex --version` may be slow to spawn.
+      if (ctx.options.suppressUnstableWarning === true) {
+        const installed = await getInstalledCodexVersion()
+        ctx.codexVersion = installed.version
+      }
+
       await writeCodexConfig(ctx)
       await ensureNotifyHook(ctx)
       await setupNotificationSound(ctx)

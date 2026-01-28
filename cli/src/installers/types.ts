@@ -21,6 +21,9 @@ export type ExperimentalFeature =
   | 'steering'              // steer
   | 'collaboration-modes'   // collaboration_modes (Plan/Pair/Execute)
   | 'child-agent-project-docs' // child_agents_md (extra AGENTS.md guidance)
+  | 'connectors'            // connectors (apps integration)
+  | 'responses-websockets'  // responses_websockets (Responses API transport)
+export type SuppressUnstableWarning = boolean | 'skip'
 export type ToolId =
   | 'rg'
   | 'fd'
@@ -56,6 +59,7 @@ export interface InstallerOptions {
   credentialsStore?: CredentialsStoreChoice | undefined
   tuiAlternateScreen?: TuiAltScreenChoice | undefined
   experimentalFeatures?: ExperimentalFeature[] | undefined
+  suppressUnstableWarning?: SuppressUnstableWarning | undefined
   mode: InstallMode
   installNode: InstallNodeMethod
   shell: string
@@ -73,6 +77,7 @@ export interface InstallerContext {
   rootDir: string
   logDir: string
   logFile: string
+  codexVersion?: string | undefined
   options: InstallerOptions
   logger: Logger
 }
