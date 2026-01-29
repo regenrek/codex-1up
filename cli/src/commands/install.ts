@@ -41,11 +41,12 @@ export const installCommand = defineCommand({
     'profiles-scope': { type: 'string', description: 'single|all (write one profile or all profiles)' },
     profile: { type: 'string', description: 'balanced|safe|yolo|skip (choose profile to write)' },
     'profile-mode': { type: 'string', description: 'add|overwrite (profile table merge strategy)' },
-    'web-search': { type: 'string', description: 'disabled|cached|live|skip (override web search mode in selected profiles)' },
+    'web-search': { type: 'string', description: 'disabled|cached|live|skip (override profiles.<name>.web_search for installed profiles; does not set root web_search)' },
     'file-opener': { type: 'string', description: 'cursor|vscode|vscode-insiders|windsurf|none|skip (open citations in editor)' },
     'credentials-store': { type: 'string', description: 'auto|file|keyring|skip (set cli_auth_credentials_store + mcp_oauth_credentials_store)' },
     'alt-screen': { type: 'string', description: 'auto|always|never|skip (set tui.alternate_screen)' },
-    experimental: { type: 'string', description: 'comma-separated experimental feature toggles: background-terminal, steering, multi-agents, collaboration-modes' },
+    experimental: { type: 'string', description: 'comma-separated experimental feature toggles: background-terminal, shell-snapshot, steering (from Codex /experimental menu)' },
+    'suppress-unstable-warning': { type: 'boolean', description: 'Suppress "Under-development features enabled …" warning (hides reminder; features may still be unstable)' },
     sound: { type: 'string', description: 'Sound file, "none", or "skip" to leave unchanged' },
     'agents-md': { type: 'string', description: 'Write starter AGENTS.md to PATH (default PWD/AGENTS.md)', required: false },
     skills: { type: 'string', description: 'Install bundled Agent Skills to ~/.codex/skills: all|skip|<comma-separated names>' }
@@ -131,6 +132,7 @@ export const installCommand = defineCommand({
     let credentialsStore: CredentialsStoreChoice | undefined
     let tuiAlternateScreen: TuiAltScreenChoice | undefined
     let experimentalFeatures: ExperimentalFeature[] | undefined
+    let suppressUnstableWarning: boolean | undefined
 
     const applySoundSelection = (choice: string) => {
       const normalized = choice.trim().toLowerCase()
@@ -179,6 +181,9 @@ export const installCommand = defineCommand({
     }
     if (cliExperimentalArg) {
       experimentalFeatures = parseExperimentalArg(cliExperimentalArg)
+    }
+    if (args['suppress-unstable-warning']) {
+      suppressUnstableWarning = true
     }
 
     if (cliToolsArg) {
@@ -244,7 +249,8 @@ export const installCommand = defineCommand({
           fileOpener,
           credentialsStore,
           tuiAlternateScreen,
-          experimentalFeatures
+          experimentalFeatures,
+          suppressUnstableWarning
         }
       })
       if (!wizardResult) return
@@ -266,7 +272,8 @@ export const installCommand = defineCommand({
         fileOpener,
         credentialsStore,
         tuiAlternateScreen,
-        experimentalFeatures
+        experimentalFeatures,
+        suppressUnstableWarning
       } = wizardResult.selections)
     }
 
@@ -311,6 +318,7 @@ export const installCommand = defineCommand({
       credentialsStore,
       tuiAlternateScreen,
       experimentalFeatures,
+      suppressUnstableWarning,
       mode: 'manual',
       installNode: (args['install-node'] as 'nvm'|'brew'|'skip') || 'skip',
       shell: String(args.shell || 'auto'),
@@ -422,14 +430,12 @@ function parseExperimentalArg(value: string): ExperimentalFeature[] {
     .map(s => s.trim().toLowerCase())
     .filter(Boolean)
   const out: ExperimentalFeature[] = []
+  // Only accept features exposed in Codex TUI's /experimental menu
   for (const p of parts) {
     if (
       p === 'background-terminal' ||
       p === 'shell-snapshot' ||
-      p === 'multi-agents' ||
-      p === 'steering' ||
-      p === 'collaboration-modes' ||
-      p === 'child-agent-project-docs'
+      p === 'steering'
     ) {
       if (!out.includes(p)) out.push(p)
       continue

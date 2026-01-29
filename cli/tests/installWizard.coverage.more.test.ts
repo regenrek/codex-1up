@@ -309,7 +309,8 @@ describe('runInstallWizard (extra coverage)', () => {
     promptState.selects.push(() => 'cursor')  // file opener
     promptState.selects.push(() => 'auto')    // credential store
     promptState.selects.push(() => 'never')   // alternate screen
-    promptState.multiselects.push(() => ['collaboration-modes', 'multi-agents'])
+    promptState.selects.push(() => 'choose')  // experimental: choose (not skip)
+    promptState.multiselects.push(() => ['background-terminal', 'steering'])
 
     // Default profile confirm (single selected profile)
     promptState.confirms.push(() => true)
@@ -330,7 +331,7 @@ describe('runInstallWizard (extra coverage)', () => {
     expect(res!.selections.fileOpener).toBe('cursor')
     expect(res!.selections.credentialsStore).toBe('auto')
     expect(res!.selections.tuiAlternateScreen).toBe('never')
-    expect(res!.selections.experimentalFeatures).toEqual(['collaboration-modes', 'multi-agents'])
+    expect(res!.selections.experimentalFeatures).toEqual(['background-terminal', 'steering'])
 
     await fs.rm(input.repoRoot, { recursive: true, force: true })
   })

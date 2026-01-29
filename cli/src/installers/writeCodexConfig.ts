@@ -76,6 +76,7 @@ export async function writeCodexConfig(ctx: InstallerContext): Promise<void> {
   touched = applyCredentialsStore(editor, ctx) || touched
   touched = applyTuiAlternateScreen(editor, ctx) || touched
   touched = applyExperimentalFeatureToggles(editor, ctx) || touched
+  touched = applySuppressUnstableFeaturesWarning(editor, ctx) || touched
   touched = normalizeReasoningSummaryForCodexModels(editor) || touched
 
   if (!touched) {
@@ -221,35 +222,55 @@ function applyExperimentalFeatureToggles(editor: TomlEditor, ctx: InstallerConte
   const targets = resolveProfileTargets(ctx.options.profileScope, ctx.options.profile, ctx.options.profilesSelected)
   if (targets.length === 0) return false
 
-  const flags: Array<{ key: string; enabled: boolean }> = []
-
-  for (const f of ctx.options.experimentalFeatures || []) {
-    if (f === 'background-terminal') {
-      flags.push({ key: 'shell_tool', enabled: true })
-    } else if (f === 'shell-snapshot') {
-      flags.push({ key: 'shell_snapshot', enabled: true })
-    } else if (f === 'multi-agents') {
-      flags.push({ key: 'collab', enabled: true })
-    } else if (f === 'steering') {
-      flags.push({ key: 'steer', enabled: true })
-    } else if (f === 'collaboration-modes') {
-      flags.push({ key: 'collaboration_modes', enabled: true })
-    } else if (f === 'child-agent-project-docs') {
-      flags.push({ key: 'child_agents_md', enabled: true })
-    }
+  // Map wizard feature names to Codex config keys (features exposed in /experimental menu)
+  const featureKeyMap: Record<string, string> = {
+    'background-terminal': 'unified_exec',  // run long-running commands in background
+    'shell-snapshot': 'shell_snapshot',     // snapshot shell env to speed up commands
+    'steering': 'steer'                     // Enter submits, Tab queues messages
   }
 
-  const wanted = flags.filter(f => f.enabled)
+  const wanted = (ctx.options.experimentalFeatures || [])
+    .map(f => featureKeyMap[f])
+    .filter(Boolean)
+
   if (wanted.length === 0) return false
 
   let changed = false
   for (const name of targets) {
     editor.ensureTable(`profiles.${name}.features`)
-    for (const { key } of wanted) {
+    for (const key of wanted) {
       changed = editor.setKey(`profiles.${name}.features`, key, 'true', { mode: 'force' }) || changed
     }
   }
   return changed
+}
+
+function applySuppressUnstableFeaturesWarning(editor: TomlEditor, ctx: InstallerContext): boolean {
+  const choice = ctx.options.suppressUnstableWarning
+  if (!choice || choice === 'skip') return false
+
+  // Only write this key if Codex is new enough to understand it (or if the user already has it).
+  const existing = editor.getRootValue('suppress_unstable_features_warning')
+  const allow =
+    Boolean(existing) ||
+    (ctx.codexVersion ? isCodexAtLeast(ctx.codexVersion, '0.92.0') : false)
+  if (!allow) return false
+
+  return editor.setRootKey('suppress_unstable_features_warning', String(choice), { mode: 'force' })
+}
+
+function isCodexAtLeast(current: string, minimum: string): boolean {
+  // Intentionally ignore prerelease/build metadata (e.g. 0.92.0-alpha.11 => 0.92.0).
+  const parse = (v: string): [number, number, number] => {
+    const core = v.split(/[+-]/)[0] || v
+    const parts = core.split('.').map(s => Number(s))
+    return [parts[0] || 0, parts[1] || 0, parts[2] || 0]
+  }
+  const [a1, a2, a3] = parse(current)
+  const [b1, b2, b3] = parse(minimum)
+  if (a1 !== b1) return a1 > b1
+  if (a2 !== b2) return a2 > b2
+  return a3 >= b3
 }
 
 function resolveProfileTargets(
