@@ -9,8 +9,9 @@ approval_policy = "on-request"       # untrusted|on-failure|on-request|never
 sandbox_mode   = "workspace-write"   # read-only|workspace-write|danger-full-access
 profile = "balanced"                 # active profile: balanced|safe|yolo
 
-# Web search mode: disabled|cached|live (v0.88+). `live` requires network access
-# when using the workspace-write sandbox.
+# Web search mode: disabled|cached|live (v0.88+).
+# Root `web_search` is a fallback default; `profiles.<name>.web_search` overrides it.
+# `live` requires network access when using the workspace-write sandbox.
 web_search = "live"
 
 # Credential storage (recommended: auto)
@@ -23,7 +24,7 @@ mcp_oauth_credentials_store = "auto"     # auto|file|keyring
 # Optional: model personality (only supported by some models, e.g. gpt-5.2-codex).
 # model_personality = "friendly"         # friendly|pragmatic
 #
-# If personalities ever look “stuck” or “not applying”, try clearing the remote models cache:
+# If personalities ever look "stuck" or "not applying", try clearing the remote models cache:
 #   rm -f ~/.codex/models_cache.json
 
 # Reasoning output controls (root keys; default false)
@@ -48,21 +49,12 @@ alternate_screen = "auto"
 [tools]
 view_image = true
 
-# Centralized feature flags (booleans only). Prefer leaving these unset unless you
-# know what you're enabling.
+# Feature flags. These are exposed in Codex TUI's /experimental menu.
+# Prefer leaving unset (Codex will use sensible defaults).
 [features]
-steer = false
-child_agents_md = false
-shell_tool = false
-shell_snapshot = false
-collab = false
-collaboration_modes = false
-connectors = false
-responses_websockets = false
-
-# Optional: hide the “Under-development features enabled …” startup warning.
-# This does NOT make under-development features stable; it only suppresses the reminder.
-# suppress_unstable_features_warning = true
+# unified_exec = false    # Background terminal - run long-running commands in background
+# shell_snapshot = false  # Snapshot shell env to speed up commands
+# steer = false           # Enter submits, Tab queues messages
 
 # ---- Profiles (override only what differs from root) -----------------------
 

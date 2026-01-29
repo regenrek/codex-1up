@@ -139,16 +139,13 @@ describe('install args mapping', () => {
       yes: true,
       'skip-confirmation': true,
       'dry-run': true,
-      experimental: 'background-terminal,shell-snapshot,multi-agents,steering,collaboration-modes,child-agent-project-docs'
+      experimental: 'background-terminal,shell-snapshot,steering'
     }) })
     const opts = captured.pop()
     expect(opts.experimentalFeatures).toEqual([
       'background-terminal',
       'shell-snapshot',
-      'multi-agents',
-      'steering',
-      'collaboration-modes',
-      'child-agent-project-docs'
+      'steering'
     ])
   })
 

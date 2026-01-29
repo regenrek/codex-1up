@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+- Installer: default web search override prompt to “Skip” and clarify that it only overrides `profiles.<name>.web_search` (root `web_search` remains a fallback).
+- Installer: revamp “experimental features” wizard step to a skip-or-choose flow and only expose the TUI `/experimental` features (Background terminal, Shell snapshot, Steer).
+
+### Fixed
+- Installer: map “Background terminal” to `features.unified_exec` (was incorrectly writing `features.shell_tool`).
+- Template: align `[features]` section to the TUI `/experimental` keys (commented examples for `unified_exec`, `shell_snapshot`, `steer`).
+
 ## [0.3.17] - 2026-01-22
 
 ### Fixed

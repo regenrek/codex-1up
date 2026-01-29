@@ -14,15 +14,11 @@ export type CredentialsStoreMode = 'auto' | 'file' | 'keyring'
 export type CredentialsStoreChoice = CredentialsStoreMode | 'skip'
 export type TuiAltScreenMode = 'auto' | 'always' | 'never'
 export type TuiAltScreenChoice = TuiAltScreenMode | 'skip'
+// Experimental features exposed in Codex TUI's /experimental menu
 export type ExperimentalFeature =
-  | 'background-terminal'   // shell_tool
-  | 'shell-snapshot'        // shell_snapshot
-  | 'multi-agents'          // collab (spawn agents)
-  | 'steering'              // steer
-  | 'collaboration-modes'   // collaboration_modes (Plan/Pair/Execute)
-  | 'child-agent-project-docs' // child_agents_md (extra AGENTS.md guidance)
-  | 'connectors'            // connectors (apps integration)
-  | 'responses-websockets'  // responses_websockets (Responses API transport)
+  | 'background-terminal'   // unified_exec - run long-running commands in background
+  | 'shell-snapshot'        // shell_snapshot - snapshot shell env to speed up commands
+  | 'steering'              // steer - Enter submits, Tab queues messages
 export type SuppressUnstableWarning = boolean | 'skip'
 export type ToolId =
   | 'rg'

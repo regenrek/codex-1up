@@ -222,35 +222,23 @@ function applyExperimentalFeatureToggles(editor: TomlEditor, ctx: InstallerConte
   const targets = resolveProfileTargets(ctx.options.profileScope, ctx.options.profile, ctx.options.profilesSelected)
   if (targets.length === 0) return false
 
-  const flags: Array<{ key: string; enabled: boolean }> = []
-
-  for (const f of ctx.options.experimentalFeatures || []) {
-    if (f === 'background-terminal') {
-      flags.push({ key: 'shell_tool', enabled: true })
-    } else if (f === 'shell-snapshot') {
-      flags.push({ key: 'shell_snapshot', enabled: true })
-    } else if (f === 'multi-agents') {
-      flags.push({ key: 'collab', enabled: true })
-    } else if (f === 'steering') {
-      flags.push({ key: 'steer', enabled: true })
-    } else if (f === 'collaboration-modes') {
-      flags.push({ key: 'collaboration_modes', enabled: true })
-    } else if (f === 'child-agent-project-docs') {
-      flags.push({ key: 'child_agents_md', enabled: true })
-    } else if (f === 'connectors') {
-      flags.push({ key: 'connectors', enabled: true })
-    } else if (f === 'responses-websockets') {
-      flags.push({ key: 'responses_websockets', enabled: true })
-    }
+  // Map wizard feature names to Codex config keys (features exposed in /experimental menu)
+  const featureKeyMap: Record<string, string> = {
+    'background-terminal': 'unified_exec',  // run long-running commands in background
+    'shell-snapshot': 'shell_snapshot',     // snapshot shell env to speed up commands
+    'steering': 'steer'                     // Enter submits, Tab queues messages
   }
 
-  const wanted = flags.filter(f => f.enabled)
+  const wanted = (ctx.options.experimentalFeatures || [])
+    .map(f => featureKeyMap[f])
+    .filter(Boolean)
+
   if (wanted.length === 0) return false
 
   let changed = false
   for (const name of targets) {
     editor.ensureTable(`profiles.${name}.features`)
-    for (const { key } of wanted) {
+    for (const key of wanted) {
       changed = editor.setKey(`profiles.${name}.features`, key, 'true', { mode: 'force' }) || changed
     }
   }

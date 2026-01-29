@@ -351,15 +351,16 @@ export async function runInstallWizard(input: InstallWizardInput): Promise<Insta
   // --- Advanced config options (Codex v0.88 config keys) -------------------
 
   if (selectedProfiles.length > 0 && !cliArgs.webSearchArg) {
+    p.log.info('Note: this overrides profiles.<name>.web_search for the profiles you are writing. Root web_search is unchanged (fallback only).')
     const ws = await p.select({
-      message: 'Web search mode (for selected profiles)',
+      message: 'Web search override (installed profiles)',
       options: [
         { label: 'Skip (leave unchanged)', value: 'skip' },
         { label: 'Disabled', value: 'disabled', hint: 'no web search tool calls' },
         { label: 'Cached', value: 'cached', hint: 'no network; may use cached results' },
         { label: 'Live', value: 'live', hint: 'requires sandbox network access' }
       ],
-      initialValue: (webSearch && webSearch !== 'skip') ? webSearch : 'live'
+      initialValue: webSearch || 'skip'
     }) as 'disabled' | 'cached' | 'live' | 'skip'
     if (p.isCancel(ws)) return cancelWizard()
     webSearch = ws
@@ -413,42 +414,32 @@ export async function runInstallWizard(input: InstallWizardInput): Promise<Insta
   }
 
   if (!cliArgs.experimentalArg) {
-    p.log.info('Optional experimental feature toggles (Codex v0.88+)')
-    p.log.info('Tip: press Esc to go back.')
-    const picked = await multiselectWithBack({
-      message: 'Enable experimental features (optional)',
+    const experimentalChoice = await p.select({
+      message: 'Experimental features (from Codex /experimental menu)',
       options: [
-        { label: 'Background terminal', value: 'background-terminal' },
-        { label: 'Shell snapshot', value: 'shell-snapshot' },
-        { label: 'Multi-agents (spawn other agents)', value: 'multi-agents' },
-        { label: 'Steer conversation', value: 'steering' },
-        { label: 'Collaboration modes (Plan/Pair/Execute)', value: 'collaboration-modes' },
-        { label: 'Child-agent project docs (extra AGENTS.md guidance)', value: 'child-agent-project-docs' },
-        { label: 'Connectors (apps integration)', value: 'connectors' },
-        { label: 'Responses WebSockets transport', value: 'responses-websockets' }
-      ]
+        { label: 'Skip (leave unchanged)', value: 'skip' },
+        { label: 'Choose features to enable', value: 'choose' }
+      ],
+      initialValue: 'skip'
     })
-    if (picked === 'back') {
-      experimentalFeatures = undefined
-    } else {
-      const chosen = Array.isArray(picked) ? picked.map(s => String(s).trim()).filter(Boolean) : []
-      experimentalFeatures = chosen.filter(isExperimentalFeature)
-    }
-  }
+    if (p.isCancel(experimentalChoice)) return cancelWizard()
 
-  // If the user enabled under-development features, offer to suppress the startup warning.
-  // This does NOT make the features stable; it only hides the reminder.
-  if (typeof suppressUnstableWarning === 'undefined') {
-    const underDevSelected = (experimentalFeatures || []).some(f =>
-      f === 'multi-agents' || f === 'connectors' || f === 'responses-websockets'
-    )
-    if (underDevSelected) {
-      const suppress = await p.confirm({
-        message: 'Suppress "Under-development features" warning at startup? (Hides the reminder; features may still be unstable.)',
-        initialValue: true
+    if (experimentalChoice === 'choose') {
+      p.log.info('Tip: press Esc to go back.')
+      const picked = await multiselectWithBack({
+        message: 'Enable experimental features',
+        options: [
+          { label: 'Background terminal', value: 'background-terminal', hint: 'run long-running commands in background' },
+          { label: 'Shell snapshot', value: 'shell-snapshot', hint: 'snapshot shell env to speed up commands' },
+          { label: 'Steer conversation', value: 'steering', hint: 'Enter submits, Tab queues messages' }
+        ]
       })
-      if (p.isCancel(suppress)) return cancelWizard()
-      suppressUnstableWarning = Boolean(suppress)
+      if (picked === 'back') {
+        experimentalFeatures = undefined
+      } else {
+        const chosen = Array.isArray(picked) ? picked.map(s => String(s).trim()).filter(Boolean) : []
+        experimentalFeatures = chosen.filter(isExperimentalFeature)
+      }
     }
   }
 
@@ -750,14 +741,10 @@ function isProfile(value: unknown): value is 'balanced'|'safe'|'yolo' {
 }
 
 function isExperimentalFeature(value: string): value is ExperimentalFeature {
+  // Only accept features exposed in Codex TUI's /experimental menu
   return value === 'background-terminal' ||
     value === 'shell-snapshot' ||
-    value === 'multi-agents' ||
-    value === 'steering' ||
-    value === 'collaboration-modes' ||
-    value === 'child-agent-project-docs' ||
-    value === 'connectors' ||
-    value === 'responses-websockets'
+    value === 'steering'
 }
 
 function cancelWizard(): null {
