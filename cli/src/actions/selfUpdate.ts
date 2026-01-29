@@ -1,7 +1,7 @@
 import * as p from '@clack/prompts'
 import { PACKAGE_NAME, PACKAGE_VERSION } from '../lib/package.js'
 import type { Logger } from '../installers/types.js'
-import { runCommand } from '../installers/utils.js'
+import { execCapture, needCmd, runCommand } from '../installers/utils.js'
 import { resolveNodeGlobalPm } from '../installers/nodeGlobal.js'
 
 export interface SelfUpdateStatus {
@@ -20,14 +20,15 @@ export interface SelfUpdateOptions {
 
 export async function checkSelfUpdate(): Promise<SelfUpdateStatus> {
   const current = PACKAGE_VERSION
-  const latest = await getLatestVersion(PACKAGE_NAME)
+  // Public API: keep fast path only (no npm fallback).
+  const latest = await getLatestVersionViaFetch(PACKAGE_NAME)
   const updateAvailable = Boolean(latest && isNewerVersion(latest, current))
   return { current, latest, updateAvailable }
 }
 
 export async function runSelfUpdate(options: SelfUpdateOptions): Promise<'updated'|'skipped'|'up-to-date'|'error'> {
   const logger = options.logger
-  const status = await checkSelfUpdate()
+  const status = await checkSelfUpdateWithFallback(logger)
   if (!status.latest) {
     logger?.warn('Unable to check for codex-1up updates right now.')
     return 'error'
@@ -83,7 +84,34 @@ export async function runSelfUpdate(options: SelfUpdateOptions): Promise<'update
   return 'updated'
 }
 
-async function getLatestVersion(pkgName: string): Promise<string | undefined> {
+async function checkSelfUpdateWithFallback(logger?: Logger): Promise<SelfUpdateStatus> {
+  const current = PACKAGE_VERSION
+  const latest = await getLatestVersionWithFallback(PACKAGE_NAME, logger)
+  const updateAvailable = Boolean(latest && isNewerVersion(latest, current))
+  return { current, latest, updateAvailable }
+}
+
+async function getLatestVersionWithFallback(pkgName: string, logger?: Logger): Promise<string | undefined> {
+  // Fast path: direct registry fetch (usually fastest, but may not honor npm proxy config).
+  const latest = await getLatestVersionViaFetch(pkgName)
+  if (latest) return latest
+
+  // Fallback: `npm view <pkg> version` (more likely to work in proxied environments).
+  // Keep a hard timeout so we never hang the wizard.
+  try {
+    if (!(await needCmd('npm'))) return undefined
+    const res = await execCapture('npm', ['view', pkgName, 'version'], { timeoutMs: 8000 })
+    if (res.timedOut) return undefined
+    if (res.code !== 0) return undefined
+    const v = (res.stdout || '').trim()
+    return v || undefined
+  } catch (e) {
+    logger?.warn(`Error checking latest codex-1up version via npm: ${e}`)
+    return undefined
+  }
+}
+
+async function getLatestVersionViaFetch(pkgName: string): Promise<string | undefined> {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 1500)
   timeout.unref?.()

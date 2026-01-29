@@ -14,6 +14,9 @@ vi.mock('../src/installers/utils.js', async () => {
   const actual = await vi.importActual<typeof import('../src/installers/utils.js')>('../src/installers/utils.js')
   return {
     ...actual,
+    // Prevent real process/network usage in tests that now have npm fallback.
+    needCmd: vi.fn(async () => false),
+    execCapture: vi.fn(async () => ({ code: 1, stdout: '', stderr: '', timedOut: false })),
     runCommand: vi.fn(async () => {})
   }
 })
