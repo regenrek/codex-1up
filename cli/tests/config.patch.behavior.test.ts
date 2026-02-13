@@ -110,8 +110,29 @@ describe('writeCodexConfig targeted patches', () => {
     await cleanup()
   })
 
+  it('does not migrate invalid model_personality values', async () => {
+    const initial = `model = "gpt-5.3-codex"\nmodel_personality = "verbose"\n`
+    const { ctx, cfgPath, cleanup } = await setupContext(initial)
+    ctx.options.profile = 'skip'
+    await writeCodexConfig(ctx)
+    const data = await fs.readFile(cfgPath, 'utf8')
+    expect(data).not.toMatch(/^\s*personality\s*=/m)
+    expect(data).toMatch(/model_personality\s*=\s*"verbose"/)
+    await cleanup()
+  })
+
   it('disables reasoning summaries for *-codex-spark models', async () => {
     const initial = `[profiles.balanced]\nmodel = "gpt-5.3-codex-spark"\nmodel_reasoning_summary = "detailed"\n`
+    const { ctx, cfgPath, cleanup } = await setupContext(initial)
+    ctx.options.profile = 'skip'
+    await writeCodexConfig(ctx)
+    const data = await fs.readFile(cfgPath, 'utf8')
+    expect(data).toMatch(/\[profiles\.balanced\][\s\S]*model_reasoning_summary\s*=\s*"none"/)
+    await cleanup()
+  })
+
+  it('disables reasoning summaries for *-codex-spark models with single-quoted strings', async () => {
+    const initial = `[profiles.balanced]\nmodel = 'gpt-5.3-codex-spark'\nmodel_reasoning_summary = 'detailed'\n`
     const { ctx, cfgPath, cleanup } = await setupContext(initial)
     ctx.options.profile = 'skip'
     await writeCodexConfig(ctx)

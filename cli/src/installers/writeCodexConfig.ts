@@ -465,9 +465,12 @@ function listProfileNames(toml: string): string[] {
 function parseTomlStringLiteral(rhs: string | undefined): string | undefined {
   if (!rhs) return undefined
   const trimmed = rhs.trim()
-  // Best-effort: handle `"value"`; leave other forms alone.
-  const m = /^"([^"]*)"\s*(?:#.*)?$/.exec(trimmed)
-  return m ? m[1] : undefined
+  // Best-effort: handle `"value"` and `'value'`; leave other forms alone.
+  // (Users may use TOML literal strings with single quotes.)
+  const basic = /^"([^"]*)"\s*(?:#.*)?$/.exec(trimmed)
+  if (basic) return basic[1]
+  const literal = /^'([^']*)'\s*(?:#.*)?$/.exec(trimmed)
+  return literal ? literal[1] : undefined
 }
 
 function migrateModelPersonalityKey(editor: TomlEditor): boolean {
@@ -477,9 +480,20 @@ function migrateModelPersonalityKey(editor: TomlEditor): boolean {
 
   let changed = false
   const existingNew = editor.getRootValue('personality')
-  if (!existingNew) {
-    changed = editor.setRootKey('personality', oldValue.trim(), { mode: 'force' }) || changed
+  const parsed = parseTomlStringLiteral(oldValue)
+  const isAllowed = parsed === 'none' || parsed === 'friendly' || parsed === 'pragmatic'
+
+  // If the new key already exists, just drop the legacy key.
+  if (existingNew) {
+    changed = editor.deleteRootKey('model_personality') || changed
+    return changed
   }
+
+  // Only migrate legacy values that are known-good; otherwise keep the old key
+  // (it was previously ignored, and migrating an invalid value could break Codex config deserialization).
+  if (!isAllowed) return false
+
+  changed = editor.setRootKey('personality', `"${parsed}"`, { mode: 'force' }) || changed
   changed = editor.deleteRootKey('model_personality') || changed
   return changed
 }
