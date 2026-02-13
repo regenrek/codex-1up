@@ -15,9 +15,9 @@ const PROFILE_DEFAULTS: Record<Profile, ProfileDefaults> = {
     root: [
       ['approval_policy', '"on-request"'],
       ['sandbox_mode', '"workspace-write"'],
-      ['model', '"gpt-5.2-codex"'],
-      ['model_reasoning_effort', '"medium"'],
-      // gpt-5.2-codex only supports reasoning.summary = "detailed" (or omitting the field).
+      ['model', '"gpt-5.3-codex"'],
+      ['model_reasoning_effort', '"high"'],
+      // NOTE: `*-codex-spark` models don't support reasoning summaries; codex-1up normalizes those to "none".
       ['model_reasoning_summary', '"detailed"'],
       // Codex v0.88+: web search mode.
       ['web_search', '"cached"']
@@ -28,9 +28,9 @@ const PROFILE_DEFAULTS: Record<Profile, ProfileDefaults> = {
     root: [
       ['approval_policy', '"untrusted"'],
       ['sandbox_mode', '"read-only"'],
-      ['model', '"gpt-5.2-codex"'],
+      ['model', '"gpt-5.3-codex"'],
       ['model_reasoning_effort', '"medium"'],
-      // gpt-5.2-codex only supports reasoning.summary = "detailed" (or omitting the field).
+      // NOTE: `*-codex-spark` models don't support reasoning summaries; codex-1up normalizes those to "none".
       ['model_reasoning_summary', '"detailed"'],
       ['web_search', '"disabled"']
     ],
@@ -40,7 +40,7 @@ const PROFILE_DEFAULTS: Record<Profile, ProfileDefaults> = {
     root: [
       ['approval_policy', '"never"'],
       ['sandbox_mode', '"danger-full-access"'],
-      ['model', '"gpt-5.2-codex"'],
+      ['model', '"gpt-5.3-codex"'],
       ['model_reasoning_effort', '"high"'],
       ['model_reasoning_summary', '"detailed"'],
       ['web_search', '"live"']

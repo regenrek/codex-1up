@@ -4,7 +4,7 @@
 # This template is aligned to Codex CLI (codex-rs) v0.101 config keys.
 
 # Core (root defaults)
-model = "gpt-5.2-codex"
+model = "gpt-5.3-codex"
 approval_policy = "on-request"       # untrusted|on-request|on-failure|never (on-failure is deprecated)
 sandbox_mode   = "workspace-write"   # read-only|workspace-write|danger-full-access
 profile = "balanced"                 # active profile: balanced|safe|yolo
@@ -75,8 +75,8 @@ view_image = true
 [profiles.balanced]
 approval_policy = "on-request"
 sandbox_mode = "workspace-write"
-model = "gpt-5.2-codex"
-model_reasoning_effort = "medium"
+model = "gpt-5.3-codex"
+model_reasoning_effort = "high"
 # NOTE: gpt-5.3-codex-spark does not support reasoning summaries. If you use a *-spark model, set:
 #   model_reasoning_summary = "none"
 model_reasoning_summary = "detailed"
@@ -85,7 +85,7 @@ web_search = "cached"
 [profiles.safe]
 approval_policy = "untrusted"
 sandbox_mode = "read-only"
-model = "gpt-5.2-codex"
+model = "gpt-5.3-codex"
 model_reasoning_effort = "medium"
 model_reasoning_summary = "detailed"
 web_search = "disabled"
@@ -93,7 +93,7 @@ web_search = "disabled"
 [profiles.yolo]
 approval_policy = "never"
 sandbox_mode = "danger-full-access"
-model = "gpt-5.2-codex"
+model = "gpt-5.3-codex"
 model_reasoning_effort = "high"
 model_reasoning_summary = "detailed"
 web_search = "live"

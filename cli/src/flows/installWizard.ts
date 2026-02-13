@@ -234,7 +234,7 @@ export async function runInstallWizard(input: InstallWizardInput): Promise<Insta
   const profileOptions = [
     { label: 'Balanced (recommended)', value: 'balanced', hint: 'on-request approvals · workspace-write · web search on' },
     { label: 'Safe', value: 'safe', hint: 'untrusted approvals · read-only · web search off' },
-    { label: 'YOLO', value: 'yolo', hint: 'never approvals · danger-full-access · gpt-5.2-codex' }
+    { label: 'YOLO', value: 'yolo', hint: 'never approvals · danger-full-access · gpt-5.3-codex' }
   ] as const
 
   if (!cliArgs.profileScope) {
@@ -286,7 +286,7 @@ export async function runInstallWizard(input: InstallWizardInput): Promise<Insta
       'Profiles:',
       '  - Balanced: on-request approvals, workspace-write sandbox, web search on.',
       '  - Safe: untrusted approvals, read-only sandbox, web search off.',
-      '  - YOLO: never approvals, danger-full-access, gpt-5.2-codex, high reasoning.'
+      '  - YOLO: never approvals, danger-full-access, gpt-5.3-codex, high reasoning.'
     ].join('\n'))
   }
 

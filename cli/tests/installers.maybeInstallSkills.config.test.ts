@@ -27,7 +27,7 @@ describe('maybeInstallSkills writes skills.config', () => {
     const codexHome = resolve(homeDir, '.codex')
     const cfgPath = resolve(codexHome, 'config.toml')
     await fs.mkdir(codexHome, { recursive: true })
-    await fs.writeFile(cfgPath, 'model = "gpt-5.2-codex"\n', 'utf8')
+    await fs.writeFile(cfgPath, 'model = "gpt-5.3-codex"\n', 'utf8')
 
     const fakeSkillSrc = resolve(homeDir, 'skill-src')
     await fs.mkdir(fakeSkillSrc, { recursive: true })
