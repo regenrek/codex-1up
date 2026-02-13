@@ -406,6 +406,8 @@ describe('runInstallWizard (extra coverage)', () => {
 
     // Profiles: skip all
     promptState.selects.push(() => 'skip')
+    // Suppress warning prompt: skip
+    promptState.selects.push(() => 'skip')
     // Sound: skip
     promptState.selects.push(() => 'skip')
     // Global agents: create starter
