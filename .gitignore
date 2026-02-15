@@ -10,3 +10,4 @@ docs
 .spezi
 .ckignore
 cli/coverage
+*.code-workspace
