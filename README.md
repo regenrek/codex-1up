@@ -70,6 +70,19 @@ codex-1up install
 
 Switch profiles anytime: `codex --profile <name>` for a session, or `codex-1up config set-profile <name>` to persist.
 
+### MiniMax profiles
+
+Set `MINIMAX_API_KEY`, then select a regional model profile:
+
+| Profile | Model | Endpoint |
+| --- | --- | --- |
+| `minimax-global-m3` | `MiniMax-M3` | `https://api.minimax.io/v1` |
+| `minimax-global-m2-7` | `MiniMax-M2.7` | `https://api.minimax.io/v1` |
+| `minimax-cn-m3` | `MiniMax-M3` | `https://api.minimaxi.com/v1` |
+| `minimax-cn-m2-7` | `MiniMax-M2.7` | `https://api.minimaxi.com/v1` |
+
+For example: `codex --profile minimax-global-m3`.
+
 ## Global guidance with AGENTS.md (optional)
 
 You can keep a global guidance file at `~/.codex/AGENTS.md` that Codex will use across projects. During install, you'll be prompted to create this; if you skip, you can create it later:

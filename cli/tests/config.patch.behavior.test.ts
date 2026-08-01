@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { promises as fs } from 'fs'
 import { tmpdir } from 'os'
 import { join, resolve } from 'path'
+import * as TOML from 'toml'
 import type { InstallerContext, InstallerOptions, Logger } from '../src/installers/types'
 import { writeCodexConfig } from '../src/installers/writeCodexConfig'
 
@@ -54,6 +55,22 @@ async function setupContext(initial: string) {
 }
 
 describe('writeCodexConfig targeted patches', () => {
+  it('adds MiniMax presets without replacing an existing provider URL', async () => {
+    const initial = `[model_providers.minimax_global]\nbase_url = "https://custom.minimax.invalid/v1"\n`
+    const { ctx, cfgPath, cleanup } = await setupContext(initial)
+    ctx.options.profile = 'skip'
+    await writeCodexConfig(ctx)
+    const data = TOML.parse(await fs.readFile(cfgPath, 'utf8')) as any
+
+    expect(data.model_providers.minimax_global.base_url).toBe('https://custom.minimax.invalid/v1')
+    expect(data.model_providers.minimax_global.env_key).toBe('MINIMAX_API_KEY')
+    expect(data.model_providers.minimax_global.wire_api).toBe('responses')
+    expect(data.model_providers.minimax_cn.base_url).toBe('https://api.minimaxi.com/v1')
+    expect(data.profiles['minimax-global-m3'].model).toBe('MiniMax-M3')
+    expect(data.profiles['minimax-cn-m2-7'].model_context_window).toBe(204800)
+    await cleanup()
+  })
+
   it('adds missing profile keys in add mode without removing custom values', async () => {
     const initial = `# existing config\n[profiles.balanced]\napproval_policy = "custom"\n\n`
     const { ctx, cfgPath, cleanup } = await setupContext(initial)
