@@ -80,6 +80,20 @@ view_image = true
 # personality = false     # Enable personality selection UI (requires restart)
 # collaboration_modes = false # Enable collaboration mode switching (requires restart)
 
+# ---- MiniMax providers -----------------------------------------------------
+
+[model_providers.minimax_global]
+name = "MiniMax (Global)"
+base_url = "https://api.minimax.io/v1"
+env_key = "MINIMAX_API_KEY"
+wire_api = "responses"
+
+[model_providers.minimax_cn]
+name = "MiniMax (China)"
+base_url = "https://api.minimaxi.com/v1"
+env_key = "MINIMAX_API_KEY"
+wire_api = "responses"
+
 # ---- Profiles (override only what differs from root) -----------------------
 
 [profiles.balanced]
@@ -107,3 +121,24 @@ model = "gpt-5.3-codex"
 model_reasoning_effort = "high"
 model_reasoning_summary = "detailed"
 web_search = "live"
+
+# MiniMax profiles inherit the root approval and sandbox settings.
+[profiles.minimax-global-m3]
+model = "MiniMax-M3"
+model_provider = "minimax_global"
+model_context_window = 1000000
+
+[profiles.minimax-global-m2-7]
+model = "MiniMax-M2.7"
+model_provider = "minimax_global"
+model_context_window = 204800
+
+[profiles.minimax-cn-m3]
+model = "MiniMax-M3"
+model_provider = "minimax_cn"
+model_context_window = 1000000
+
+[profiles.minimax-cn-m2-7]
+model = "MiniMax-M2.7"
+model_provider = "minimax_cn"
+model_context_window = 204800
