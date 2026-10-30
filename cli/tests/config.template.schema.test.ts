@@ -22,6 +22,7 @@ const ROOT_KEYS = new Set([
   'tui',
   'tools',
   'features',
+  'model_providers',
   'profiles'
 ])
 
@@ -51,6 +52,8 @@ const TUI_KEYS = new Set([
 ])
 
 const TOOLS_KEYS = new Set(['view_image', 'web_search'])
+
+const MODEL_PROVIDER_KEYS = new Set(['name', 'base_url', 'env_key', 'wire_api'])
 
 const FEATURES_KEYS = new Set([
   'undo',
@@ -87,6 +90,8 @@ const PROFILE_KEYS = new Set([
   'approval_policy',
   'sandbox_mode',
   'model',
+  'model_provider',
+  'model_context_window',
   'model_reasoning_effort',
   'model_reasoning_summary',
   'web_search',
@@ -127,6 +132,14 @@ describe('templates/codex-config.toml schema guard', () => {
 
     if (data.tools && typeof data.tools === 'object') {
       assertKeysAllowed(data.tools as Record<string, unknown>, TOOLS_KEYS, 'tools')
+    }
+
+    if (data.model_providers && typeof data.model_providers === 'object') {
+      const providers = data.model_providers as Record<string, unknown>
+      for (const [name, value] of Object.entries(providers)) {
+        expect(typeof value).toBe('object')
+        assertKeysAllowed(value as Record<string, unknown>, MODEL_PROVIDER_KEYS, `model_providers.${name}`)
+      }
     }
 
     if (data.features && typeof data.features === 'object') {

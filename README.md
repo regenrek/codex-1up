@@ -70,6 +70,23 @@ codex-1up install
 
 Switch profiles anytime: `codex --profile <name>` for a session, or `codex-1up config set-profile <name>` to persist.
 
+### MiniMax profiles
+
+Set `MINIMAX_API_KEY`, then select a regional model profile. Start with Flash:
+
+| Profile | Model | Endpoint |
+| --- | --- | --- |
+| `minimax-global-m3-flash` | `MiniMax-M3.1-Flash` | `https://api.minimax.io/v1` |
+| `minimax-global-m3` | `MiniMax-M3` | `https://api.minimax.io/v1` |
+| `minimax-cn-m3-flash` | `MiniMax-M3.1-Flash` | `https://api.minimaxi.com/v1` |
+| `minimax-cn-m3` | `MiniMax-M3` | `https://api.minimaxi.com/v1` |
+
+For example: `codex --profile minimax-global-m3-flash`.
+
+These profiles use the native Responses API and disable hosted web search and reasoning summaries. Flash always reasons (default effort `max`); M3 defaults to reasoning off when effort is omitted. The installer adds missing settings without replacing saved model IDs, custom provider URLs, or existing legacy profiles. Existing provider URLs remain unchanged; compare them with the documented endpoints above when upgrading.
+
+API contracts: [Global](https://platform.minimax.io/docs/api-reference/responses-create) · [China](https://platform.minimaxi.com/docs/api-reference/responses-create).
+
 ## Global guidance with AGENTS.md (optional)
 
 You can keep a global guidance file at `~/.codex/AGENTS.md` that Codex will use across projects. During install, you'll be prompted to create this; if you skip, you can create it later:

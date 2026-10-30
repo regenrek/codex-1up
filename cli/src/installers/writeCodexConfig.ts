@@ -49,6 +49,52 @@ const PROFILE_DEFAULTS: Record<Profile, ProfileDefaults> = {
   }
 }
 
+const MINIMAX_PROVIDER_PRESETS: Record<string, Array<[string, string]>> = {
+  minimax_global: [
+    ['name', '"MiniMax (Global)"'],
+    ['base_url', '"https://api.minimax.io/v1"'],
+    ['env_key', '"MINIMAX_API_KEY"'],
+    ['wire_api', '"responses"']
+  ],
+  minimax_cn: [
+    ['name', '"MiniMax (China)"'],
+    ['base_url', '"https://api.minimaxi.com/v1"'],
+    ['env_key', '"MINIMAX_API_KEY"'],
+    ['wire_api', '"responses"']
+  ]
+}
+
+const MINIMAX_PROFILE_PRESETS: Record<string, Array<[string, string]>> = {
+  'minimax-global-m3-flash': [
+    ['model', '"MiniMax-M3.1-Flash"'],
+    ['model_provider', '"minimax_global"'],
+    ['model_context_window', '1000000'],
+    ['model_reasoning_summary', '"none"'],
+    ['web_search', '"disabled"']
+  ],
+  'minimax-global-m3': [
+    ['model', '"MiniMax-M3"'],
+    ['model_provider', '"minimax_global"'],
+    ['model_context_window', '1000000'],
+    ['model_reasoning_summary', '"none"'],
+    ['web_search', '"disabled"']
+  ],
+  'minimax-cn-m3-flash': [
+    ['model', '"MiniMax-M3.1-Flash"'],
+    ['model_provider', '"minimax_cn"'],
+    ['model_context_window', '1000000'],
+    ['model_reasoning_summary', '"none"'],
+    ['web_search', '"disabled"']
+  ],
+  'minimax-cn-m3': [
+    ['model', '"MiniMax-M3"'],
+    ['model_provider', '"minimax_cn"'],
+    ['model_context_window', '1000000'],
+    ['model_reasoning_summary', '"none"'],
+    ['web_search', '"disabled"']
+  ]
+}
+
 const HEADER_COMMENT = '# ~/.codex/config.toml — managed by codex-1up (patch mode)\n'
 
 export async function writeCodexConfig(ctx: InstallerContext): Promise<void> {
@@ -70,6 +116,7 @@ export async function writeCodexConfig(ctx: InstallerContext): Promise<void> {
     prunedRemovedFeatures.changed
 
   touched = migrateModelPersonalityKey(editor) || touched
+  touched = applyMiniMaxPresets(editor) || touched
 
   touched = applyProfile(
     editor,
@@ -117,6 +164,25 @@ export async function writeCodexConfig(ctx: InstallerContext): Promise<void> {
 
   await fs.writeFile(cfgPath, finalContent, 'utf8')
   ctx.logger.ok('Updated ~/.codex/config.toml with requested settings.')
+}
+
+function applyMiniMaxPresets(editor: TomlEditor): boolean {
+  let changed = false
+  for (const [name, fields] of Object.entries(MINIMAX_PROVIDER_PRESETS)) {
+    const table = `model_providers.${name}`
+    editor.ensureTable(table)
+    for (const [key, value] of fields) {
+      changed = editor.setKey(table, key, value, { mode: 'if-missing' }) || changed
+    }
+  }
+  for (const [name, fields] of Object.entries(MINIMAX_PROFILE_PRESETS)) {
+    const table = `profiles.${name}`
+    editor.ensureTable(table)
+    for (const [key, value] of fields) {
+      changed = editor.setKey(table, key, value, { mode: 'if-missing' }) || changed
+    }
+  }
+  return changed
 }
 
 function applyProfile(
