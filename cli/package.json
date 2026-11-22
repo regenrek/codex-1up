@@ -19,7 +19,7 @@
     "@clack/prompts": "^0.11.0",
     "citty": "^0.1.6",
     "fs-extra": "^11.2.0",
-    "toml": "^3.0.0",
+    "toml": "^5.0.1",
     "zx": "^8.1.7"
   },
   "devDependencies": {
